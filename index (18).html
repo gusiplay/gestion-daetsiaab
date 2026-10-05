@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Tareas - Delegación ETSIAAB</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen flex flex-col">
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <div class="text-center mb-6">
+                <div class="bg-emerald-500/10 text-emerald-400 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl">
+                    <i class="fa-solid fa-seedling"></i>
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight">Delegación ETSIAAB</h1>
+                <p class="text-sm text-slate-400 mt-1">Selecciona tu perfil e introduce tu contraseña</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Miembro del equipo</label>
+                    <select id="user-select" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-slate-100">
+                        <option value="" disabled selected>Cargando miembros...</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Contraseña</label>
+                    <input type="password" id="password-input" placeholder="••••••••" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <button onclick="handleLogin()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 rounded-xl transition-all shadow-lg shadow-emerald-600/20">
+                    Entrar al Panel
+                </button>
+                <p id="login-error" class="text-rose-400 text-xs text-center hidden">Contraseña incorrecta o usuario no seleccionado</p>
+            </div>
+            <div class="mt-6 text-center text-xs text-slate-500 space-y-1">
+                <p>Contraseña por defecto: <code class="bg-slate-800 px-2 py-1 rounded text-slate-300">etsiaab2026</code></p>
+                <p class="text-emerald-400 font-semibold flex items-center justify-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sistema Local e Independiente
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="main-app" class="hidden flex-1 flex flex-col">
+        <!-- HEADER -->
+        <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30">
+            <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-emerald-500 text-slate-950 font-black px-3 py-1.5 rounded-lg text-sm">
+                        ETSIAAB
+                    </div>
+                    <span class="font-bold text-lg tracking-tight hidden sm:inline">Gestión Delegación</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-3">
+                        <div id="header-avatar" class="w-10 h-10 rounded-full bg-slate-800 border border-emerald-500/40 flex items-center justify-center text-xl overflow-hidden shadow">
+                            🌱
+                        </div>
+                        <div class="text-right hidden sm:block">
+                            <div id="current-user-display" class="text-sm font-semibold text-emerald-400">Usuario</div>
+                            <div id="current-user-role" class="text-xs text-slate-400">Miembro activo</div>
+                        </div>
+                    </div>
+                    <button onclick="handleLogout()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-medium transition-all flex items-center space-x-1.5">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Salir</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- CONTENT -->
+        <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
+            <!-- TABS & ACTIONS -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+                <div class="flex bg-slate-800/80 p-1.5 rounded-xl border border-slate-700/60 max-w-fit flex-wrap gap-1">
+                    <button onclick="switchTab('my-tasks')" id="tab-my-tasks" class="px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-emerald-600 text-white shadow">
+                        Mis Tareas
+                    </button>
+                    <button onclick="switchTab('team-view')" id="tab-team-view" class="px-4 py-2 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white">
+                        Vista del Equipo
+                    </button>
+                    <button onclick="switchTab('my-profile')" id="tab-my-profile" class="px-4 py-2 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white">
+                        Mi Perfil y Contraseña
+                    </button>
+                    <button id="tab-admin-users-btn" onclick="switchTab('admin-users')" class="hidden px-4 py-2 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white">
+                        Gestionar Miembros (Admin)
+                    </button>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <div id="sync-status-badge" class="hidden sm:flex items-center space-x-1.5 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs">
+                        <i class="fa-solid fa-hard-drive text-[10px]"></i>
+                        <span id="sync-status-text">Almacenamiento Local Seguro</span>
+                    </div>
+                    <button onclick="openNewTaskModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-2 shadow-lg shadow-emerald-600/20">
+                        <i class="fa-solid fa-plus"></i>
+                        <span id="btn-new-task-text">Nueva Tarea</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- TAB 1: MY TASKS -->
+            <div id="view-my-tasks" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-slate-800/50 border border-slate-800 rounded-2xl p-5">
+                        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">Pendientes</div>
+                        <div id="count-pending" class="text-3xl font-black text-amber-400">0</div>
+                    </div>
+                    <div class="bg-slate-800/50 border border-slate-800 rounded-2xl p-5">
+                        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">En Proceso</div>
+                        <div id="count-progress" class="text-3xl font-black text-sky-400">0</div>
+                    </div>
+                    <div class="bg-slate-800/50 border border-slate-800 rounded-2xl p-5">
+                        <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">Completadas</div>
+                        <div id="count-completed" class="text-3xl font-black text-emerald-400">0</div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/30 border border-slate-800 rounded-2xl p-6">
+                    <h2 class="text-lg font-bold mb-4 flex items-center space-x-2">
+                        <i class="fa-solid fa-list-check text-emerald-500"></i>
+                        <span>Tareas Asignadas a Mí</span>
+                    </h2>
+                    <div id="my-tasks-list" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <!-- TAB 2: TEAM VIEW -->
+            <div id="view-team-view" class="hidden space-y-6">
+                <div class="bg-slate-800/30 border border-slate-800 rounded-2xl p-6">
+                    <h2 class="text-lg font-bold mb-4 flex items-center space-x-2">
+                        <i class="fa-solid fa-users text-emerald-500"></i>
+                        <span>Estado General de la Delegación</span>
+                    </h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-700/60 text-xs uppercase text-slate-400 font-semibold">
+                                    <th class="py-3 px-4">Miembro y Rol</th>
+                                    <th class="py-3 px-4">Tareas Totales</th>
+                                    <th class="py-3 px-4">Completadas</th>
+                                    <th class="py-3 px-4">Progreso</th>
+                                </tr>
+                            </thead>
+                            <tbody id="team-stats-table" class="divide-y divide-slate-800 text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/30 border border-slate-800 rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                        <h2 class="text-lg font-bold flex items-center space-x-2">
+                            <i class="fa-solid fa-table-list text-emerald-500"></i>
+                            <span>Todas las Tareas del Equipo (Control de Dirección y Escalafón)</span>
+                        </h2>
+                        <div id="admin-delete-all-container" class="hidden">
+                            <button onclick="deleteAllCompletedTasks()" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span>Eliminar Completadas</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="all-tasks-list" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <!-- TAB 3: MY PROFILE -->
+            <div id="view-my-profile" class="hidden space-y-6">
+                <div class="bg-slate-800/30 border border-slate-800 rounded-2xl p-6 max-w-xl mx-auto">
+                    <h2 class="text-lg font-bold mb-4 flex items-center space-x-2">
+                        <i class="fa-solid fa-user-gear text-emerald-500"></i>
+                        <span>Editar Mi Perfil</span>
+                    </h2>
+                    <form onsubmit="handleUpdateProfile(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Tu Nombre</label>
+                            <input type="text" id="profile-name" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Tu Cargo en la Delegación</label>
+                            <select id="profile-role" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500" disabled></select>
+                            <p id="profile-role-notice" class="text-[11px] text-amber-400 mt-1 hidden">Solo el Delegado o Subdelegada 1ª pueden editar los cargos del equipo.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Foto de Perfil (Emoji o URL de imagen)</label>
+                            <input type="text" id="profile-avatar" placeholder="Ej: 👨‍🌾, 🚀 o URL de imagen" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Nueva Contraseña</label>
+                            <input type="password" id="profile-password" placeholder="Déjalo en blanco para mantener la actual" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <div class="pt-2">
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 rounded-xl transition-all shadow-lg shadow-emerald-600/20">
+                                Guardar Cambios
+                            </button>
+                        </div>
+                        <p id="profile-success" class="text-emerald-400 text-xs text-center hidden">¡Perfil actualizado correctamente!</p>
+                    </form>
+                </div>
+            </div>
+
+            <!-- TAB 4: ADMIN USERS -->
+            <div id="view-admin-users" class="hidden space-y-6">
+                <div class="bg-slate-800/30 border border-slate-800 rounded-2xl p-6">
+                    <h2 class="text-lg font-bold mb-2 flex items-center space-x-2">
+                        <i class="fa-solid fa-users-gear text-emerald-500"></i>
+                        <span>Panel de Dirección: Gestión de Miembros y Contraseñas</span>
+                    </h2>
+                    <p class="text-xs text-slate-400 mb-6">Desde aquí puedes cambiar los cargos de cualquier miembro, actualizar sus contraseñas o avatares.</p>
+                    <div id="admin-users-list" class="space-y-4"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- NEW TASK MODAL -->
+    <div id="task-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="modal-title" class="text-lg font-bold">Nueva Tarea</h3>
+                <button onclick="closeNewTaskModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form onsubmit="handleCreateTask(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Título de la tarea</label>
+                    <input type="text" id="new-title" required placeholder="Ej: Preparar material San Isidro" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Descripción detallada</label>
+                    <textarea id="new-desc" rows="3" required placeholder="Explica exactamente qué hay que hacer, dónde y cómo..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500"></textarea>
+                </div>
+                <div id="assignees-section">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2" id="assignees-label">Asignar a miembros</label>
+                    <div id="assignees-checkboxes" class="grid grid-cols-2 gap-2 bg-slate-800/50 border border-slate-700 rounded-xl p-3 max-h-40 overflow-y-auto"></div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Urgencia</label>
+                        <select id="new-urgency" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500">
+                            <option value="muy-urgente">🔥 Muy Urgente</option>
+                            <option value="urgente">⚡ Urgente</option>
+                            <option value="normal">📌 Normal</option>
+                            <option value="poco-urgente">☕ Poco Urgente</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Plazo / Fecha límite</label>
+                        <input type="date" id="new-date" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeNewTaskModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all">Cancelar</button>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-lg shadow-emerald-600/20">Crear y Guardar Tarea</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SCRIPT -->
+    <script>
+        const officialRoles = [
+            "Delegado de Escuela",
+            "Secretaría General",
+            "Subdelegado Primero",
+            "Subdelegado Gestión Económica, Eventos y Asociaciones",
+            "Secretaría de Logística Universitaria",
+            "Secretaría de Atención al Estudiante",
+            "Secretaría de Eventos y Asociaciones",
+            "Secretaría de Gestión Económica",
+            "Subdelegado de RRSS",
+            "Secretaría de Edición y Patrocinios",
+            "Subdelegado de Externas y Política Universitaria",
+            "Secretaría de Relaciones Profesionales/Jobcrop",
+            "Subdelegado de Convivencia y Desarrollo Sostenible",
+            "Secretaría de Igualdad",
+            "Subdelegado de Calidad y Asuntos Académicos",
+            "Secretaría de Asuntos Académicos"
+        ];
+
+        const hierarchy = {
+            "Augusto": ["Augusto", "Rosa", "Ada", "Lorenzo", "Alberto", "Sebastian", "Rodrigo", "Gema", "Lucia", "Edicion", "Miguel", "Jobcrop", "Carol", "Lydia", "Eva", "Mayra"],
+            "Ada": ["Augusto", "Rosa", "Ada", "Lorenzo", "Alberto", "Sebastian", "Rodrigo", "Gema", "Lucia", "Edicion", "Miguel", "Jobcrop", "Carol", "Lydia", "Eva", "Mayra"],
+            "Lorenzo": ["Lorenzo", "Rodrigo", "Gema"],
+            "Alberto": ["Alberto", "Lucia", "Edicion", "Miguel", "Jobcrop", "Carol", "Lydia", "Eva", "Mayra"],
+            "Sebastian": ["Sebastian", "Carol", "Lydia", "Eva", "Mayra"],
+            "Lucia": ["Lucia", "Edicion"],
+            "Miguel": ["Miguel", "Jobcrop"],
+            "Carol": ["Carol", "Lydia"],
+            "Eva": ["Eva", "Mayra"],
+            "Rosa": ["Rosa"],
+            "Rodrigo": ["Rodrigo"],
+            "Gema": ["Gema"],
+            "Edicion": ["Edicion"],
+            "Jobcrop": ["Jobcrop"],
+            "Lydia": ["Lydia"],
+            "Mayra": ["Mayra"]
+        };
+
+        const defaultUsers = {
+            "Augusto": { name: "Augusto Fernández", role: "Delegado de Escuela", pass: "etsiaab2026", avatar: "👨‍🌾" },
+            "Rosa": { name: "Rosa González", role: "Secretaría General", pass: "etsiaab2026", avatar: "📝" },
+            "Ada": { name: "Ada Bañuls", role: "Subdelegado Primero", pass: "etsiaab2026", avatar: "👩‍🌾" },
+            "Lorenzo": { name: "Lorenzo Martínez", role: "Subdelegado Gestión Económica, Eventos y Asociaciones", pass: "etsiaab2026", avatar: "📊" },
+            "Alberto": { name: "Alberto Cárdenas", role: "Secretaría de Logística Universitaria", pass: "etsiaab2026", avatar: "🚚" },
+            "Sebastian": { name: "Sebastián Martínez", role: "Secretaría de Atención al Estudiante", pass: "etsiaab2026", avatar: "💬" },
+            "Rodrigo": { name: "Rodrigo Villafranca", role: "Secretaría de Eventos y Asociaciones", pass: "etsiaab2026", avatar: "🎉" },
+            "Gema": { name: "Gema Rioja", role: "Secretaría de Gestión Económica", pass: "etsiaab2026", avatar: "💶" },
+            "Lucia": { name: "Lucía Fernández", role: "Subdelegado de RRSS", pass: "etsiaab2026", avatar: "📸" },
+            "Edicion": { name: "Vacante Edición", role: "Secretaría de Edición y Patrocinios", pass: "etsiaab2026", avatar: "🎨" },
+            "Miguel": { name: "Miguel Hurtado", role: "Subdelegado de Externas y Política Universitaria", pass: "etsiaab2026", avatar: "🏛️" },
+            "Jobcrop": { name: "Vacante Jobcrop", role: "Secretaría de Relaciones Profesionales/Jobcrop", pass: "etsiaab2026", avatar: "🤝" },
+            "Carol": { name: "Carol Guantes", role: "Subdelegado de Convivencia y Desarrollo Sostenible", pass: "etsiaab2026", avatar: "🌿" },
+            "Lydia": { name: "Lydia Gallego", role: "Secretaría de Igualdad", pass: "etsiaab2026", avatar: "⚖️" },
+            "Eva": { name: "Eva Almendros", role: "Subdelegado de Calidad y Asuntos Académicos", pass: "etsiaab2026", avatar: "📚" },
+            "Mayra": { name: "Mayra Moreno", role: "Secretaría de Asuntos Académicos", pass: "etsiaab2026", avatar: "📝" }
+        };
+
+        const defaultTasks = [
+            { 
+                id: 1, 
+                title: "Coordinación general del equipo", 
+                desc: "Revisar los preparativos para el evento de la escuela y alinear convocatorias.", 
+                assignees: ["Augusto", "Rosa"], 
+                assigneeStatus: { "Augusto": "completed", "Rosa": "pending" },
+                urgency: "muy-urgente", 
+                dueDate: "2026-10-10", 
+                completedAt: null 
+            }
+        ];
+
+        // INICIALIZACIÓN 100% ROBUSTA LOCAL (Evita cualquier bloqueo de red, CORS o file://)
+        let users = JSON.parse(localStorage.getItem('etsiaab_users')) || defaultUsers;
+        let tasks = JSON.parse(localStorage.getItem('etsiaab_tasks')) || defaultTasks;
+        let currentUserKey = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            // Asegurarnos de que localStorage tenga datos si estuviera corrupto
+            if (!users || Object.keys(users).length === 0) {
+                users = defaultUsers;
+                localStorage.setItem('etsiaab_users', JSON.stringify(users));
+            }
+            if (!tasks || tasks.length === 0) {
+                tasks = defaultTasks;
+                localStorage.setItem('etsiaab_tasks', JSON.stringify(tasks));
+            }
+
+            populateUserSelect();
+            populateRoleSelects();
+            populateCheckboxes();
+        });
+
+        function saveDataLocally() {
+            localStorage.setItem('etsiaab_users', JSON.stringify(users));
+            localStorage.setItem('etsiaab_tasks', JSON.stringify(tasks));
+        }
+
+        function populateRoleSelects() {
+            const profileRoleSelect = document.getElementById('profile-role');
+            if (profileRoleSelect) {
+                profileRoleSelect.innerHTML = officialRoles.map(r => `<option value="${r}">${r}</option>`).join('');
+            }
+        }
+
+        function populateUserSelect() {
+            const select = document.getElementById('user-select');
+            if (!select) return;
+            const currentVal = select.value;
+            select.innerHTML = '<option value="" disabled selected>Elige tu nombre...</option>';
+            
+            const sourceUsers = (users && Object.keys(users).length > 0) ? users : defaultUsers;
+            
+            for (let key in sourceUsers) {
+                const u = sourceUsers[key];
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = `${u.name} (${u.role})`;
+                select.appendChild(opt);
+            }
+            select.value = currentVal;
+        }
+
+        function populateCheckboxes() {
+            const container = document.getElementById('assignees-checkboxes');
+            const labelEl = document.getElementById('assignees-label');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            const allowedMembers = hierarchy[currentUserKey] || [currentUserKey];
+            const sourceUsers = (users && Object.keys(users).length > 0) ? users : defaultUsers;
+
+            if (allowedMembers.length > 1) {
+                if (currentUserKey === 'Augusto' || currentUserKey === 'Ada') {
+                    labelEl.textContent = "Asignar a miembros de la Delegación (puedes marcar varios)";
+                } else {
+                    labelEl.textContent = "Asignar a miembros de tu área / equipo subordinado (puedes marcar varios)";
+                }
+
+                allowedMembers.forEach(key => {
+                    if (sourceUsers[key]) {
+                        const u = sourceUsers[key];
+                        container.innerHTML += `
+                            <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer hover:text-white p-1">
+                                <input type="checkbox" name="task-assignee" value="${key}" class="rounded bg-slate-900 border-slate-700 text-emerald-600 focus:ring-emerald-500">
+                                <span class="truncate">${u.name} (${u.role})</span>
+                            </label>
+                        `;
+                    }
+                });
+            } else {
+                labelEl.textContent = "Tarea personal (autoasignada)";
+                if (currentUserKey && sourceUsers[currentUserKey]) {
+                    const u = sourceUsers[currentUserKey];
+                    container.innerHTML += `
+                        <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer hover:text-white p-1">
+                            <input type="checkbox" name="task-assignee" value="${currentUserKey}" checked onclick="return false;" class="rounded bg-slate-900 border-slate-700 text-emerald-600 focus:ring-emerald-500">
+                            <span class="truncate">${u.name} (Tú)</span>
+                        </label>
+                    `;
+                }
+            }
+        }
+
+        function handleLogin() {
+            const userKey = document.getElementById('user-select').value;
+            const pass = document.getElementById('password-input').value;
+            const errorEl = document.getElementById('login-error');
+
+            if (!userKey || !users[userKey]) {
+                errorEl.textContent = "Por favor selecciona tu nombre.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            if (users[userKey].pass !== pass) {
+                errorEl.textContent = "Contraseña incorrecta. Si la has olvidado, pídesela a Augusto o Ada.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            currentUserKey = userKey;
+            updateHeaderInfo();
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            
+            const btnText = document.getElementById('btn-new-task-text');
+            const adminDeleteAllContainer = document.getElementById('admin-delete-all-container');
+            const tabAdminBtn = document.getElementById('tab-admin-users-btn');
+            
+            if (currentUserKey === 'Augusto' || currentUserKey === 'Ada') {
+                btnText.textContent = "Nueva Tarea (Dirección)";
+                adminDeleteAllContainer.classList.remove('hidden');
+                tabAdminBtn.classList.remove('hidden');
+                document.getElementById('profile-role').disabled = false;
+                document.getElementById('profile-role-notice').classList.add('hidden');
+            } else {
+                if (hierarchy[currentUserKey] && hierarchy[currentUserKey].length > 1) {
+                    btnText.textContent = "Nueva Tarea (Área)";
+                } else {
+                    btnText.textContent = "Crear Mi Tarea";
+                }
+                adminDeleteAllContainer.classList.add('hidden');
+                tabAdminBtn.classList.add('hidden');
+                document.getElementById('profile-role').disabled = true;
+                document.getElementById('profile-role-notice').classList.remove('hidden');
+            }
+
+            document.getElementById('profile-name').value = users[userKey].name;
+            document.getElementById('profile-role').value = users[userKey].role;
+            document.getElementById('profile-avatar').value = users[userKey].avatar || "🌱";
+            document.getElementById('profile-password').value = "";
+            document.getElementById('profile-success').classList.add('hidden');
+
+            renderApp();
+        }
+
+        function updateHeaderInfo() {
+            if (!currentUserKey || !users[currentUserKey]) return;
+            const u = users[currentUserKey];
+            document.getElementById('current-user-display').textContent = u.name;
+            document.getElementById('current-user-role').textContent = u.role;
+            
+            const avatarEl = document.getElementById('header-avatar');
+            if (u.avatar && u.avatar.startsWith('http')) {
+                avatarEl.innerHTML = `<img src="${u.avatar}" class="w-full h-full object-cover rounded-full">`;
+            } else {
+                avatarEl.textContent = u.avatar || "🌱";
+            }
+        }
+
+        function handleLogout() {
+            currentUserKey = null;
+            document.getElementById('password-input').value = "";
+            document.getElementById('user-select').value = "";
+            document.getElementById('main-app').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+        }
+
+        function switchTab(tab) {
+            if (tab === 'admin-users' && currentUserKey !== 'Augusto' && currentUserKey !== 'Ada') {
+                alert("Acceso no autorizado.");
+                return;
+            }
+
+            const btnMy = document.getElementById('tab-my-tasks');
+            const btnTeam = document.getElementById('tab-team-view');
+            const btnProfile = document.getElementById('tab-my-profile');
+            const btnAdmin = document.getElementById('tab-admin-users-btn');
+            
+            const viewMy = document.getElementById('view-my-tasks');
+            const viewTeam = document.getElementById('view-team-view');
+            const viewProfile = document.getElementById('view-my-profile');
+            const viewAdmin = document.getElementById('view-admin-users');
+
+            [btnMy, btnTeam, btnProfile, btnAdmin].forEach(b => {
+                if(b) b.className = "px-4 py-2 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white";
+            });
+            [viewMy, viewTeam, viewProfile, viewAdmin].forEach(v => {
+                if(v) v.classList.add('hidden');
+            });
+
+            if (tab === 'my-tasks') {
+                btnMy.className = "px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-emerald-600 text-white shadow";
+                viewMy.classList.remove('hidden');
+                renderMyTasks();
+            } else if (tab === 'team-view') {
+                btnTeam.className = "px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-emerald-600 text-white shadow";
+                viewTeam.classList.remove('hidden');
+                renderTeamView();
+            } else if (tab === 'my-profile') {
+                btnProfile.className = "px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-emerald-600 text-white shadow";
+                viewProfile.classList.remove('hidden');
+            } else if (tab === 'admin-users') {
+                if (currentUserKey === 'Augusto' || currentUserKey === 'Ada') {
+                    if(btnAdmin) btnAdmin.className = "px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-emerald-600 text-white shadow";
+                    if(viewAdmin) viewAdmin.classList.remove('hidden');
+                    renderAdminUsersList();
+                }
+            }
+        }
+
+        function renderApp() {
+            renderMyTasks();
+        }
+
+        function getGoogleCalendarUrl(title, desc, dueDate) {
+            const cleanDate = dueDate.replace(/-/g, '');
+            const encodedTitle = encodeURIComponent(title);
+            const encodedDesc = encodeURIComponent(desc + " (Delegación ETSIAAB)");
+            return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodedTitle}&dates=${cleanDate}/${cleanDate}&details=${encodedDesc}`;
+        }
+
+        function renderMyTasks() {
+            tasks = JSON.parse(localStorage.getItem('etsiaab_tasks')) || tasks;
+            users = JSON.parse(localStorage.getItem('etsiaab_users')) || users;
+
+            const container = document.getElementById('my-tasks-list');
+            const myTasks = tasks.filter(t => t.assignees && t.assignees.includes(currentUserKey));
+
+            let pending = 0, progress = 0, completed = 0;
+            myTasks.forEach(t => {
+                const myStatus = (t.assigneeStatus && t.assigneeStatus[currentUserKey]) || 'pending';
+                if (myStatus === 'pending') pending++;
+                else if (myStatus === 'in-progress') progress++;
+                else if (myStatus === 'completed') completed++;
+            });
+
+            document.getElementById('count-pending').textContent = pending;
+            document.getElementById('count-progress').textContent = progress;
+            document.getElementById('count-completed').textContent = completed;
+
+            if (myTasks.length === 0) {
+                container.innerHTML = `<div class="text-center py-8 text-slate-500 text-sm">No tienes ninguna tarea asignada actualmente. ¡Buen trabajo!</div>`;
+                return;
+            }
+
+            container.innerHTML = myTasks.map(t => {
+                const calUrl = getGoogleCalendarUrl(t.title, t.desc, t.dueDate);
+                const myStatus = (t.assigneeStatus && t.assigneeStatus[currentUserKey]) || 'pending';
+                
+                const assigneesBreakdown = t.assignees.map(k => {
+                    const u = users[k] || defaultUsers[k] || { name: k, avatar: '🌱' };
+                    const st = (t.assigneeStatus && t.assigneeStatus[k]) || 'pending';
+                    let stIcon = '⏳';
+                    let stColor = 'text-amber-400';
+                    if (st === 'in-progress') { stIcon = '⚡'; stColor = 'text-sky-400'; }
+                    if (st === 'completed') { stIcon = '✅'; stColor = 'text-emerald-400'; }
+                    return `<span class="inline-flex items-center space-x-1 bg-slate-900 px-2 py-0.5 rounded border border-slate-700/80 text-[11px] mr-1 mb-1">
+                        <span>${u.avatar || '🌱'}</span>
+                        <span class="font-medium text-slate-200">${u.name}</span>
+                        <span class="${stColor}">${stIcon}</span>
+                    </span>`;
+                }).join('');
+
+                const allCompleted = t.assignees.every(k => t.assigneeStatus && t.assigneeStatus[k] === 'completed');
+
+                return `
+                <div class="bg-slate-800/60 border ${allCompleted ? 'border-emerald-500/40 bg-emerald-950/10' : 'border-slate-700/60'} rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="space-y-2 flex-1">
+                        <div class="flex items-center flex-wrap gap-2">
+                            <h4 class="font-bold text-sm ${myStatus === 'completed' ? 'line-through text-slate-400' : 'text-slate-200'}">${t.title}</h4>
+                            <span class="text-[10px] px-2 py-0.5 rounded font-medium ${getUrgencyBadgeClass(t.urgency)}">${getUrgencyText(t.urgency)}</span>
+                            ${allCompleted ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">🎉 ¡Completada por todos!</span>' : ''}
+                        </div>
+                        <p class="text-xs text-slate-300 bg-slate-900/50 p-2.5 rounded-lg border border-slate-800">${t.desc}</p>
+                        
+                        <div>
+                            <div class="text-[10px] uppercase tracking-wider text-slate-400 mb-1 font-semibold">Estado del equipo asignado:</div>
+                            <div class="flex flex-wrap">${assigneesBreakdown}</div>
+                        </div>
+
+                        <div class="text-[11px] text-slate-500 flex items-center space-x-3 pt-1 flex-wrap gap-2">
+                            <span><i class="fa-regular fa-calendar mr-1"></i> Plazo: ${t.dueDate}</span>
+                            <a href="${calUrl}" target="_blank" class="bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 px-2 py-0.5 rounded text-[10px] font-semibold transition-all inline-flex items-center space-x-1">
+                                <i class="fa-solid fa-calendar-plus"></i>
+                                <span>Añadir a Google Calendar</span>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3 self-end sm:self-center">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-1">Tu Estado:</label>
+                            <select onchange="updateMyTaskStatus(${t.id}, this.value)" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 font-medium">
+                                <option value="pending" ${myStatus === 'pending' ? 'selected' : ''}>⏳ Pendiente</option>
+                                <option value="in-progress" ${myStatus === 'in-progress' ? 'selected' : ''}>⚡ En Proceso</option>
+                                <option value="completed" ${myStatus === 'completed' ? 'selected' : ''}>✅ Completada</option>
+                            </select>
+                        </div>
+                        <button onclick="deleteTask(${t.id})" title="Eliminar tarea" class="text-slate-500 hover:text-rose-400 p-1.5 transition-colors self-end sm:self-center">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+            `;}).join('');
+        }
+
+        function renderTeamView() {
+            tasks = JSON.parse(localStorage.getItem('etsiaab_tasks')) || tasks;
+            users = JSON.parse(localStorage.getItem('etsiaab_users')) || users;
+            const sourceUsers = (users && Object.keys(users).length > 0) ? users : defaultUsers;
+
+            const tableBody = document.getElementById('team-stats-table');
+            
+            tableBody.innerHTML = Object.keys(sourceUsers).map(key => {
+                const u = sourceUsers[key];
+                const userTasks = tasks.filter(t => t.assignees && t.assignees.includes(key));
+                const total = userTasks.length;
+                const comp = userTasks.filter(t => t.assigneeStatus && t.assigneeStatus[key] === 'completed').length;
+                const pct = total > 0 ? Math.round((comp / total) * 100) : 0;
+                
+                let avatarHTML = u.avatar && u.avatar.startsWith('http') ? `<img src="${u.avatar}" class="w-6 h-6 rounded-full object-cover inline mr-2">` : `<span class="mr-2">${u.avatar || '🌱'}</span>`;
+
+                return `
+                    <tr class="border-b border-slate-800/50">
+                        <td class="py-3 px-4 font-medium text-slate-200">
+                            <div class="flex items-center">
+                                ${avatarHTML}
+                                <div>
+                                    <div>${u.name}</div>
+                                    <div class="text-xs text-slate-400 font-normal">${u.role}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-3 px-4 text-slate-400">${total}</td>
+                        <td class="py-3 px-4 text-slate-400">${comp}</td>
+                        <td class="py-3 px-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-24 bg-slate-800 rounded-full h-2 overflow-hidden">
+                                    <div class="bg-emerald-500 h-full rounded-full" style="width: ${pct}%"></div>
+                                </div>
+                                <span class="text-xs font-semibold text-slate-400">${pct}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            const allTasksContainer = document.getElementById('all-tasks-list');
+            
+            if (tasks.length === 0) {
+                allTasksContainer.innerHTML = `<div class="text-center py-8 text-slate-500 text-sm">No hay tareas en este momento.</div>`;
+                return;
+            }
+
+            allTasksContainer.innerHTML = tasks.map(t => {
+                const canManage = (currentUserKey === 'Augusto' || currentUserKey === 'Ada' || (t.assignees && t.assignees.includes(currentUserKey)));
+                const calUrl = getGoogleCalendarUrl(t.title, t.desc, t.dueDate);
+                const allCompleted = t.assignees && t.assignees.every(k => t.assigneeStatus && t.assigneeStatus[k] === 'completed');
+
+                const assigneesBadges = t.assignees.map(k => {
+                    const u = sourceUsers[k] || defaultUsers[k] || { name: k, avatar: '🌱' };
+                    const st = (t.assigneeStatus && t.assigneeStatus[k]) || 'pending';
+                    let stColor = 'border-amber-500/30 text-amber-400 bg-amber-500/10';
+                    let stIcon = '⏳';
+                    if (st === 'in-progress') { stColor = 'border-sky-500/30 text-sky-400 bg-sky-500/10'; stIcon = '⚡'; }
+                    if (st === 'completed') { stColor = 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'; stIcon = '✅'; }
+                    return `<span class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border ${stColor} text-xs font-medium mr-1 mb-1">
+                        <span>${u.avatar || '🌱'}</span>
+                        <span>${u.name}</span>
+                        <span>${stIcon}</span>
+                    </span>`;
+                }).join('');
+
+                return `
+                    <div class="bg-slate-800/40 border ${allCompleted ? 'border-emerald-500/40' : 'border-slate-700/50'} rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="space-y-1.5 flex-1">
+                            <div class="flex items-center flex-wrap gap-2">
+                                <h4 class="font-bold text-sm text-slate-200">${t.title}</h4>
+                                <span class="text-[10px] px-2 py-0.5 rounded font-medium ${getUrgencyBadgeClass(t.urgency)}">${getUrgencyText(t.urgency)}</span>
+                                ${allCompleted ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">🎉 ¡Completada por todos!</span>' : '<span class="text-[10px] px-2 py-0.5 rounded font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">Pendiente de equipo</span>'}
+                            </div>
+                            <p class="text-xs text-slate-300">${t.desc}</p>
+                            
+                            <div class="pt-1">
+                                <div class="text-[10px] uppercase text-slate-400 font-semibold mb-1">Asignados y estados individuales:</div>
+                                <div class="flex flex-wrap">${assigneesBadges}</div>
+                            </div>
+
+                            <div class="pt-1 flex items-center space-x-3 flex-wrap gap-2">
+                                <a href="${calUrl}" target="_blank" class="bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 px-2 py-0.5 rounded text-[10px] font-semibold transition-all inline-flex items-center space-x-1">
+                                    <i class="fa-solid fa-calendar-plus"></i>
+                                    <span>Google Calendar</span>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4 text-xs text-slate-400 flex-wrap gap-2 self-start sm:self-center">
+                            <span><i class="fa-regular fa-calendar mr-1"></i> ${t.dueDate}</span>
+                            ${canManage ? `
+                                <button onclick="deleteTask(${t.id})" title="Eliminar tarea" class="text-slate-500 hover:text-rose-400 p-1.5 transition-colors">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderAdminUsersList() {
+            if (currentUserKey !== 'Augusto' && currentUserKey !== 'Ada') return;
+            const container = document.getElementById('admin-users-list');
+            if (!container) return;
+            const sourceUsers = (users && Object.keys(users).length > 0) ? users : defaultUsers;
+            
+            container.innerHTML = Object.keys(sourceUsers).map(key => {
+                const u = sourceUsers[key];
+                let roleOptions = officialRoles.map(r => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r}</option>`).join('');
+
+                return `
+                    <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div class="flex items-center space-x-3 w-full md:w-auto">
+                            <div class="text-2xl">${u.avatar || '🌱'}</div>
+                            <div>
+                                <h4 class="font-bold text-sm text-slate-200">${u.name} <span class="text-xs text-slate-500 font-normal">(${key})</span></h4>
+                                <p class="text-xs text-emerald-400">${u.role}</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+                            <select id="admin-role-${key}" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 w-full sm:w-56 focus:outline-none focus:border-emerald-500">
+                                ${roleOptions}
+                            </select>
+                            <input type="text" id="admin-pass-${key}" value="${u.pass}" placeholder="Contraseña" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 w-full sm:w-32 focus:outline-none focus:border-emerald-500">
+                            <button onclick="adminSaveUser('${key}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap">
+                                Guardar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function adminSaveUser(key) {
+            if (currentUserKey !== 'Augusto' && currentUserKey !== 'Ada') return;
+            const newRole = document.getElementById(`admin-role-${key}`).value;
+            const newPass = document.getElementById(`admin-pass-${key}`).value;
+            
+            if (users[key]) {
+                users[key].role = newRole;
+                users[key].pass = newPass;
+                saveDataLocally();
+                populateUserSelect();
+                alert(`¡Datos de ${users[key].name} actualizados correctamente!`);
+                renderAdminUsersList();
+            }
+        }
+
+        function deleteTask(id) {
+            tasks = JSON.parse(localStorage.getItem('etsiaab_tasks')) || tasks;
+            const task = tasks.find(t => t.id === id);
+            if (!task) return;
+            
+            if (currentUserKey === 'Augusto' || currentUserKey === 'Ada' || (task.assignees && task.assignees.includes(currentUserKey))) {
+                if (confirm("¿Estás seguro de eliminar esta tarea?")) {
+                    tasks = tasks.filter(t => t.id !== id);
+                    saveDataLocally();
+                    renderTeamView();
+                    if (currentUserKey) renderMyTasks();
+                }
+            } else {
+                alert("No tienes permisos para eliminar esta tarea.");
+            }
+        }
+
+        function deleteAllCompletedTasks() {
+            if (currentUserKey === 'Augusto' || currentUserKey === 'Ada') {
+                if (confirm("¿Estás seguro de eliminar todas las tareas completadas por todos del equipo?")) {
+                    tasks = tasks.filter(t => {
+                        const allDone = t.assignees && t.assignees.every(k => t.assigneeStatus && t.assigneeStatus[k] === 'completed');
+                        return !allDone;
+                    });
+                    saveDataLocally();
+                    renderTeamView();
+                    if (currentUserKey) renderMyTasks();
+                }
+            }
+        }
+
+        function handleUpdateProfile(e) {
+            e.preventDefault();
+            const newName = document.getElementById('profile-name').value;
+            const newAvatar = document.getElementById('profile-avatar').value;
+            const newPass = document.getElementById('profile-password').value;
+
+            users[currentUserKey].name = newName;
+            if(newAvatar.trim() !== "") users[currentUserKey].avatar = newAvatar;
+            if(newPass.trim() !== "") users[currentUserKey].pass = newPass;
+
+            if (currentUserKey === 'Augusto' || currentUserKey === 'Ada') {
+                users[currentUserKey].role = document.getElementById('profile-role').value;
+            }
+
+            saveDataLocally();
+            updateHeaderInfo();
+            populateUserSelect();
+            
+            document.getElementById('profile-success').classList.remove('hidden');
+            setTimeout(() => { document.getElementById('profile-success').classList.add('hidden'); }, 3000);
+        }
+
+        function updateMyTaskStatus(id, newStatus) {
+            tasks = JSON.parse(localStorage.getItem('etsiaab_tasks')) || tasks;
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                if (!task.assigneeStatus) task.assigneeStatus = {};
+                task.assigneeStatus[currentUserKey] = newStatus;
+                
+                const allDone = task.assignees.every(k => task.assigneeStatus[k] === 'completed');
+                if (allDone && !task.completedAt) {
+                    task.completedAt = new Date().getTime();
+                } else if (!allDone) {
+                    task.completedAt = null;
+                }
+
+                saveDataLocally();
+                renderMyTasks();
+                if (!document.getElementById('view-team-view').classList.contains('hidden')) {
+                    renderTeamView();
+                }
+            }
+        }
+
+        function openNewTaskModal() {
+            populateCheckboxes();
+            const modalTitle = document.getElementById('modal-title');
+            if (currentUserKey === 'Augusto' || currentUserKey === 'Ada') {
+                modalTitle.textContent = "Asignar Tarea en Grupo (Dirección)";
+            } else if (hierarchy[currentUserKey] && hierarchy[currentUserKey].length > 1) {
+                modalTitle.textContent = "Asignar Tarea en Grupo (Área de Subdelegación)";
+            } else {
+                modalTitle.textContent = "Crear Mi Tarea Personal";
+            }
+            document.getElementById('task-modal').classList.remove('hidden');
+        }
+
+        function closeNewTaskModal() {
+            document.getElementById('task-modal').classList.add('hidden');
+            document.getElementById('new-title').value = "";
+            document.getElementById('new-desc').value = "";
+            document.getElementById('new-date').value = "";
+        }
+
+        function handleCreateTask(e) {
+            e.preventDefault();
+            const title = document.getElementById('new-title').value;
+            const desc = document.getElementById('new-desc').value;
+            const urgency = document.getElementById('new-urgency').value;
+            const dueDate = document.getElementById('new-date').value;
+
+            tasks = JSON.parse(localStorage.getItem('etsiaab_tasks')) || tasks;
+
+            let assignees = [];
+            const allowedMembers = hierarchy[currentUserKey] || [currentUserKey];
+
+            if (allowedMembers.length > 1) {
+                const checkboxes = document.querySelectorAll('input[name="task-assignee"]:checked');
+                checkboxes.forEach(cb => assignees.push(cb.value));
+                if (assignees.length === 0) {
+                    alert("Por favor, selecciona al menos un miembro.");
+                    return;
+                }
+            } else {
+                assignees = [currentUserKey];
+            }
+
+            let assigneeStatus = {};
+            assignees.forEach(k => { assigneeStatus[k] = 'pending'; });
+
+            const newTask = {
+                id: tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) + 1 : 1,
+                title, desc, assignees, assigneeStatus, urgency, dueDate, completedAt: null
+            };
+
+            tasks.push(newTask);
+            saveDataLocally();
+            closeNewTaskModal();
+            renderTeamView();
+            if (currentUserKey) renderMyTasks();
+        }
+
+        function getUrgencyText(u) {
+            if (u === 'muy-urgente') return '🔥 Muy Urgente';
+            if (u === 'urgente') return '⚡ Urgente';
+            if (u === 'normal') return '📌 Normal';
+            if (u === 'poco-urgente') return '☕ Poco Urgente';
+            return u;
+        }
+
+        function getUrgencyBadgeClass(u) {
+            if (u === 'muy-urgente') return 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+            if (u === 'urgente') return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+            if (u === 'normal') return 'bg-sky-500/10 text-sky-400 border border-sky-500/20';
+            return 'bg-slate-700/50 text-slate-400 border border-slate-600';
+        }
+    </script>
+</body>
+</html>
