@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestión de Tareas - Delegación ETSIAAB</title>
 <link rel="manifest" href="manifest.json">
+<style>
+.light body{background:#f1f5f9!important}
+.light [class*="bg-slate-9"]{background-color:#fff!important}
+.light [class*="bg-slate-8"]{background-color:#e2e8f0!important}
+.light [class*="border-slate"]{border-color:#cbd5e1!important}
+.light [class*="text-slate-1"],.light [class*="text-slate-2"],.light [class*="text-slate-3"]{color:#1e293b!important}
+.light [class*="text-slate-4"],.light [class*="text-slate-5"]{color:#64748b!important}
+.light .text-emerald-400{color:#047857!important}.light .text-sky-400{color:#0369a1!important}
+</style>
 <meta name="theme-color" content="#0f172a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -51,6 +60,7 @@
             <div id="current-user-role" class="text-xs text-slate-400"></div>
           </div>
         </div>
+        <button onclick="toggleTheme()" title="Modo claro/oscuro" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs"><i class="fa-solid fa-circle-half-stroke"></i></button>
         <button onclick="handleLogout()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-medium"><i class="fa-solid fa-right-from-bracket"></i> Salir</button>
       </div>
     </div>
@@ -61,6 +71,7 @@
       <div class="flex bg-slate-800/80 p-1.5 rounded-xl border border-slate-700/60 max-w-fit flex-wrap gap-1">
         <button onclick="switchTab('my-tasks')" id="tab-my-tasks" class="px-4 py-2 rounded-lg text-xs font-semibold">Mis Tareas</button>
         <button onclick="switchTab('team-view')" id="tab-team-view" class="px-4 py-2 rounded-lg text-xs font-semibold">Vista del Equipo</button>
+        <button onclick="switchTab('calendar')" id="tab-calendar" class="px-4 py-2 rounded-lg text-xs font-semibold">Calendario</button>
         <button onclick="switchTab('my-profile')" id="tab-my-profile" class="px-4 py-2 rounded-lg text-xs font-semibold">Mi Perfil y Contraseña</button>
         <button onclick="switchTab('admin-users')" id="tab-admin-users" class="hidden px-4 py-2 rounded-lg text-xs font-semibold">Gestionar Miembros (Admin)</button>
       </div>
@@ -96,9 +107,22 @@
           <div class="flex gap-2 flex-wrap"><button id="export-btn" onclick="exportCSV()" class="hidden bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold"><i class="fa-solid fa-file-csv"></i> Exportar a Excel</button>
           <button id="delete-completed-btn" onclick="deleteAllCompletedTasks()" class="hidden bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold"><i class="fa-solid fa-trash-can"></i> Eliminar Completadas</button></div>
         </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+          <input id="f-text" oninput="renderTeamView()" placeholder="🔎 Buscar..." class="col-span-2 md:col-span-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs">
+          <select id="f-person" onchange="renderTeamView()" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs"></select>
+          <select id="f-urg" onchange="renderTeamView()" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs"><option value="">Toda urgencia</option><option value="muy-urgente">🔥 Muy urgente</option><option value="urgente">⚡ Urgente</option><option value="normal">📌 Normal</option><option value="poco-urgente">☕ Poco urgente</option></select>
+          <select id="f-status" onchange="renderTeamView()" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs"><option value="">Todos los estados</option><option value="open">Abiertas</option><option value="done">Completadas</option><option value="overdue">Vencidas</option></select>
+        </div>
         <div id="all-tasks-list" class="space-y-3"></div>
       </div>
     </div>
+
+    <div id="view-calendar" class="hidden"><div class="bg-slate-800/30 border border-slate-800 rounded-2xl p-3 sm:p-6">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2"><div class="flex items-center gap-3">
+        <button onclick="calMove(-1)" class="bg-slate-800 px-3 py-1 rounded-lg">‹</button><h2 id="cal-title" class="text-lg font-bold capitalize"></h2><button onclick="calMove(1)" class="bg-slate-800 px-3 py-1 rounded-lg">›</button></div>
+        <label class="text-xs text-slate-400 flex items-center gap-2"><input type="checkbox" id="cal-mine" onchange="renderCalendar()" class="rounded"> Solo las mías</label></div>
+      <div class="grid grid-cols-7 gap-1 text-center text-[10px] uppercase text-slate-500 mb-1"><div>L</div><div>M</div><div>X</div><div>J</div><div>V</div><div>S</div><div>D</div></div>
+      <div id="cal-grid" class="grid grid-cols-7 gap-1"></div></div></div>
 
     <div id="view-my-profile" class="hidden">
       <div class="bg-slate-800/30 border border-slate-800 rounded-2xl p-6 max-w-xl mx-auto">
@@ -119,6 +143,11 @@
       <div class="bg-slate-800/30 border border-slate-800 rounded-2xl p-6">
         <h2 class="text-lg font-bold mb-2"><i class="fa-solid fa-users-gear text-emerald-500"></i> Gestión de Miembros y Contraseñas</h2>
         <p class="text-xs text-slate-400 mb-6">Escribe una contraseña nueva y pulsa Guardar. Por seguridad las actuales no se muestran.</p>
+        <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 mb-6 grid sm:grid-cols-4 gap-2">
+          <input id="nm-name" placeholder="Nombre y apellido" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs">
+          <select id="nm-role" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs"></select>
+          <input id="nm-pass" placeholder="Contraseña inicial" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs">
+          <button onclick="addMember()" class="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-3 py-2 text-xs font-semibold">+ Añadir miembro</button></div>
         <div id="admin-users-list" class="space-y-4"></div>
       </div>
     </div>
@@ -139,16 +168,19 @@
           <option value="muy-urgente">🔥 Muy Urgente</option><option value="urgente">⚡ Urgente</option><option value="normal" selected>📌 Normal</option><option value="poco-urgente">☕ Poco Urgente</option></select>
         <input type="date" id="new-date" required class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm">
       </div>
+      <select id="new-repeat" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm"><option value="">🔁 No se repite</option><option value="weekly">🔁 Se repite cada semana</option><option value="monthly">🔁 Se repite cada mes</option></select>
+      <textarea id="new-steps" rows="3" placeholder="Pasos de la tarea (uno por línea, opcional)" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm"></textarea>
       <div class="flex justify-end space-x-3"><button type="button" onclick="closeNewTaskModal()" class="bg-slate-800 text-slate-300 px-4 py-2.5 rounded-xl text-xs font-semibold">Cancelar</button>
         <button type="submit" id="modal-submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold">Crear Tarea</button></div>
     </form>
   </div>
 </div>
 
+<div id="offline-bar" class="hidden fixed bottom-0 inset-x-0 bg-amber-500 text-slate-950 text-xs font-semibold text-center py-2 z-[60]">📡 Sin conexión: los cambios se enviarán al volver (no cierres la página)</div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, getDocs, writeBatch, arrayUnion }
+import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, getDocs, writeBatch, arrayUnion, arrayRemove }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ====== PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE (Configuración del proyecto > Tus apps > Web) ======
@@ -185,7 +217,8 @@ const defaultUsers = {
 
 let users = {}, tasks = [], me = null, db, sessionPass = null;
 const $ = id => document.getElementById(id);
-const isAdmin = () => me === "Augusto" || me === "Ada";
+const isAdminKey = k => k === "Augusto" || k === "Ada" || users[k]?.admin === true;
+const isAdmin = () => isAdminKey(me);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const hash = async (key, pass) => {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`etsiaab:${key}:${pass}`));
@@ -194,9 +227,64 @@ const hash = async (key, pass) => {
 const statusOf = (t, k) => (t.assigneeStatus && t.assigneeStatus[k]) || "pending";
 const isDone = t => (t.assignees || []).length > 0 && t.assignees.every(k => statusOf(t, k) === "completed");
 
+// ---------- Utilidades nuevas ----------
+const nm = k => users[k]?.name || k;
+const fmt = at => new Date(at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
+const linkify = x => esc(x).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" class="text-sky-400 underline break-all">$1</a>');
+const teamOf = k => isAdminKey(k) ? Object.keys(users) : [...new Set([k, ...(users[k]?.manages ?? hierarchy[k] ?? [])])];
+const sysEntry = text => ({ by: me, text, at: Date.now(), sys: true });
+const nextDate = (d, r) => { const x = new Date(d + "T12:00:00"); r === "weekly" ? x.setDate(x.getDate() + 7) : x.setMonth(x.getMonth() + 1); return x.toLocaleDateString("sv-SE"); };
+// Contraseñas: PBKDF2 con sal (las antiguas SHA-256 se migran solas al entrar)
+const b2h = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+const pb = async (p, salt) => b2h(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations: 150000 },
+  await crypto.subtle.importKey("raw", new TextEncoder().encode(p), "PBKDF2", false, ["deriveBits"]), 256));
+const mkHash = async p => { const salt = b2h(crypto.getRandomValues(new Uint8Array(16))); return `pb$${salt}$${await pb(p, salt)}`; };
+const verify = async (k, p, st) => st.startsWith("pb$") ? (await pb(p, st.split("$")[1])) === st.split("$")[2] : st === await hash(k, p);
+const getFail = () => { try { return JSON.parse(localStorage.getItem("etsiaab_fail")) || { n: 0, until: 0 }; } catch { return { n: 0, until: 0 }; } };
+const setFail = f => { try { localStorage.setItem("etsiaab_fail", JSON.stringify(f)); } catch {} };
+// Pasos, filtros, calendario
+const stepsHTML = t => (t.steps || []).length ? `<div class="space-y-1">${t.steps.map((x, i) => `<label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" ${x.done ? "checked" : ""} onchange="toggleStep('${t.id}',${i})" class="rounded"><span class="${x.done ? "line-through text-slate-500" : ""}">${esc(x.t)}</span></label>`).join("")}</div>` : "";
+window.toggleStep = (id, i) => { const t = tasks.find(x => x.id === id); return updateDoc(doc(db, "tasks", id), { steps: t.steps.map((x, j) => j === i ? { ...x, done: !x.done } : x) }); };
+const filterTasks = () => {
+  const q = $("f-text").value.toLowerCase(), p = $("f-person").value, u = $("f-urg").value, s = $("f-status").value;
+  return tasks.filter(t => (!q || (t.title + " " + t.desc).toLowerCase().includes(q)) && (!p || (t.assignees || []).includes(p)) && (!u || t.urgency === u)
+    && (!s || (s === "done" ? isDone(t) : s === "open" ? !isDone(t) : isOverdue(t))));
+};
+function fillPersonFilter() {
+  const el = $("f-person"), cur = el.value;
+  el.innerHTML = '<option value="">Todas las personas</option>' + Object.entries(users).map(([k, u]) => `<option value="${esc(k)}">${esc(u.name)}</option>`).join("");
+  el.value = cur;
+}
+let calY = new Date().getFullYear(), calM = new Date().getMonth();
+window.calMove = d => { calM += d; if (calM < 0) { calM = 11; calY--; } if (calM > 11) { calM = 0; calY++; } renderCalendar(); };
+function renderCalendar() {
+  const first = new Date(calY, calM, 1), pad = (first.getDay() + 6) % 7, days = new Date(calY, calM + 1, 0).getDate();
+  $("cal-title").textContent = first.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+  const list = $("cal-mine").checked ? tasks.filter(t => (t.assignees || []).includes(me)) : tasks;
+  let cells = "<div></div>".repeat(pad);
+  for (let d = 1; d <= days; d++) {
+    const ds = `${calY}-${String(calM + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    cells += `<div class="min-h-[64px] sm:min-h-[96px] bg-slate-800/40 border ${ds === today() ? "border-emerald-500" : "border-slate-800"} rounded-lg p-1"><div class="text-[10px] text-slate-400">${d}</div>${list.filter(t => t.dueDate === ds).map(t =>
+      `<div onclick="openEditTask('${t.id}')" title="${esc(t.title)}" class="truncate text-[10px] mt-0.5 px-1 rounded cursor-pointer ${isDone(t) ? "bg-emerald-500/20 text-emerald-300 line-through" : isOverdue(t) ? "bg-rose-500/20 text-rose-300" : "bg-sky-500/20 text-sky-300"}">${esc(t.title)}</div>`).join("")}</div>`;
+  }
+  $("cal-grid").innerHTML = cells;
+}
+Object.assign(window, { renderAll, renderTeamView, renderCalendar });
+// Tema, conexión y copia de seguridad
+window.toggleTheme = () => { const l = document.documentElement.classList.toggle("light"); try { localStorage.setItem("etsiaab_theme", l ? "light" : "dark"); } catch {} };
+try { if (localStorage.getItem("etsiaab_theme") === "light") document.documentElement.classList.add("light"); } catch {}
+const offBar = () => $("offline-bar").classList.toggle("hidden", navigator.onLine);
+addEventListener("online", offBar); addEventListener("offline", offBar); offBar();
+function backupReminder() {
+  if (!isAdmin()) return;
+  setTimeout(() => { try {
+    if (tasks.length && Date.now() - (+localStorage.getItem("etsiaab_backup") || 0) > 7 * 864e5 && confirm("Hace más de 7 días de la última copia de seguridad. ¿Descargar ahora el CSV?")) exportCSV();
+  } catch {} }, 4000);
+}
+
 // ---------- Firebase ----------
 async function init() {
-  $("profile-role").innerHTML = officialRoles.map(r => `<option>${esc(r)}</option>`).join("");
+  $("profile-role").innerHTML = $("nm-role").innerHTML = officialRoles.map(r => `<option>${esc(r)}</option>`).join("");
   if (firebaseConfig.apiKey === "PEGA_AQUI") { setConn(false, "Falta pegar la configuración de Firebase"); return; }
   try {
     const app = initializeApp(firebaseConfig);
@@ -240,10 +328,19 @@ window.handleLogin = async () => {
   const k = $("user-select").value, err = $("login-error");
   err.classList.remove("hidden");
   if (!k || !users[k]) { err.textContent = "Selecciona tu nombre."; return; }
-  const h = await hash(k, $("password-input").value);
-  if (users[k].pass !== h) { err.textContent = "Contraseña incorrecta. Si la han cambiado, pídesela a Augusto o Ada."; return; }
+  const f = getFail();
+  if (f.until > Date.now()) { err.textContent = `Demasiados intentos. Espera ${Math.ceil((f.until - Date.now()) / 1000)} s.`; return; }
+  const pw = $("password-input").value;
+  if (!(await verify(k, pw, users[k].pass))) {
+    f.n++; if (f.n >= 5) f.until = Date.now() + Math.min(900000, 30000 * 2 ** (f.n - 5)); setFail(f);
+    err.textContent = "Contraseña incorrecta. Si la han cambiado, pídesela a Augusto o Ada."; return;
+  }
+  setFail({ n: 0, until: 0 });
   err.classList.add("hidden");
-  enterApp(k, h);
+  let st = users[k].pass;
+  if (!st.startsWith("pb$")) { st = await mkHash(pw); sessionPass = st; await updateDoc(doc(db, "users", k), { pass: st }); }
+  enterApp(k, st);
+enterApp(k, h);
 };
 function tryAutoLogin() {
   try { const x = JSON.parse(localStorage.getItem("etsiaab_session") || "null");
@@ -258,7 +355,7 @@ function enterApp(k, h) {
   $("export-btn").classList.toggle("hidden", !isAdmin());
   $("profile-role").disabled = !isAdmin();
   $("profile-role-notice").classList.toggle("hidden", isAdmin());
-  fillProfile(); updateHeader(); switchTab("my-tasks");
+  fillProfile(); updateHeader(); switchTab("my-tasks"); backupReminder();
 };
 window.handleLogout = () => {
   me = null; sessionPass = null; try { localStorage.removeItem("etsiaab_session"); } catch {} $("password-input").value = ""; $("user-select").value = "";
@@ -288,6 +385,7 @@ function renderAll() {
   if (tab === "my-tasks") renderMyTasks();
   if (tab === "team-view") renderTeamView();
   if (tab === "admin-users") renderAdmin();
+  if (tab === "calendar") renderCalendar();
 }
 const urgText = u => ({ "muy-urgente": "🔥 Muy Urgente", urgente: "⚡ Urgente", normal: "📌 Normal" }[u] || "☕ Poco Urgente");
 const urgClass = u => ({ "muy-urgente": "bg-rose-500/10 text-rose-400 border border-rose-500/20", urgente: "bg-amber-500/10 text-amber-400 border border-amber-500/20", normal: "bg-sky-500/10 text-sky-400 border border-sky-500/20" }[u] || "bg-slate-700/50 text-slate-400 border border-slate-600");
@@ -300,9 +398,15 @@ const calUrl = t => { const d = (t.dueDate || "").replace(/-/g, ""); return `htt
 const openC = new Set();
 window.toggleComments = id => { openC.has(id) ? openC.delete(id) : openC.add(id); renderAll(); };
 const commentsHTML = t => {
-  const c = t.comments || [], open = openC.has(t.id);
-  return `<div class="mt-1"><button onclick="toggleComments('${t.id}')" class="text-[11px] text-sky-400 hover:underline"><i class="fa-regular fa-comments"></i> Comentarios (${c.length})</button>${open ? `<div class="mt-2 space-y-2">${c.map(x => `<div class="bg-slate-900/60 border border-slate-800 rounded-lg p-2 text-xs"><span class="text-emerald-400 font-semibold">${esc(users[x.by]?.name || x.by)}</span> <span class="text-slate-500">${new Date(x.at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}</span><p class="text-slate-300 whitespace-pre-wrap">${esc(x.text)}</p></div>`).join("")}
+  const all = t.comments || [], open = openC.has(t.id);
+  return `<div class="mt-1"><button onclick="toggleComments('${t.id}')" class="text-[11px] text-sky-400 hover:underline"><i class="fa-regular fa-comments"></i> Comentarios e historial (${all.filter(x => !x.sys).length})</button>${open ? `<div class="mt-2 space-y-2">${all.map(x => x.sys
+    ? `<div class="text-[11px] text-slate-500 italic">🕑 ${esc(nm(x.by))} ${esc(x.text)} · ${fmt(x.at)}</div>`
+    : `<div class="bg-slate-900/60 border border-slate-800 rounded-lg p-2 text-xs"><div class="flex justify-between"><span><b class="text-emerald-400">${esc(nm(x.by))}</b> <span class="text-slate-500">${fmt(x.at)}</span></span>${(x.by === me || isAdmin()) ? `<button onclick="delComment('${t.id}',${x.at})" class="text-slate-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>` : ""}</div><p class="text-slate-300 whitespace-pre-wrap">${linkify(x.text)}</p></div>`).join("")}
     <div class="flex gap-2"><input id="cmt-${t.id}" maxlength="500" placeholder="Escribe un comentario..." onkeydown="if(event.key==='Enter')addComment('${t.id}')" class="cmt-input flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs"><button onclick="addComment('${t.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 rounded-lg text-xs font-semibold">Enviar</button></div></div>` : ""}</div>`;
+};
+window.delComment = async (id, at) => {
+  const c = (tasks.find(x => x.id === id)?.comments || []).find(x => x.at === at && !x.sys);
+  if (c && confirm("¿Borrar este comentario?")) await updateDoc(doc(db, "tasks", id), { comments: arrayRemove(c) });
 };
 window.addComment = async id => {
   const inp = $("cmt-" + id), text = inp.value.trim(); if (!text) return;
@@ -314,12 +418,13 @@ const getSeen = () => { try { const v = localStorage.getItem(seenKey()); return 
 const saveSeen = ids => { try { localStorage.setItem(seenKey(), JSON.stringify(ids)); } catch {} };
 let seenTimer;
 window.exportCSV = () => {
+  try { localStorage.setItem("etsiaab_backup", Date.now()); } catch {}
   const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`, nm = k => users[k]?.name || k;
   const st = { pending: "Pendiente", "in-progress": "En proceso", completed: "Completada" };
   const head = ["Título", "Descripción", "Urgencia", "Plazo", "Asignados", "Estado por persona", "Completada", "Creada por", "Comentarios"];
   const rows = tasks.map(t => [t.title, t.desc, urgText(t.urgency), t.dueDate, (t.assignees || []).map(nm).join(", "),
     (t.assignees || []).map(k => `${nm(k)}: ${st[statusOf(t, k)]}`).join(" | "), isDone(t) ? "Sí" : "No", nm(t.createdBy || ""),
-    (t.comments || []).map(c => `${nm(c.by)}: ${c.text}`).join(" | ")]);
+    (t.comments || []).filter(c => !c.sys).map(c => `${nm(c.by)}: ${c.text}`).join(" | ")]);
   const csv = "\ufeff" + [head, ...rows].map(r => r.map(q).join(";")).join("\r\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = `tareas-etsiaab-${today()}.csv`;
@@ -345,7 +450,8 @@ function renderMyTasks() {
         <div class="flex items-center flex-wrap gap-2"><h4 class="font-bold text-sm ${my === "completed" ? "line-through text-slate-400" : ""}">${esc(t.title)}</h4>
           <span class="text-[10px] px-2 py-0.5 rounded font-medium ${urgClass(t.urgency)}">${urgText(t.urgency)}</span>
           ${done ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-400">🎉 ¡Completada!</span>' : ""}${overdue ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-rose-500/20 text-rose-400">⚠️ Vencida</span>' : ""}${isNew(t) ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-sky-500/20 text-sky-300 animate-pulse">🆕 Nueva</span>' : ""}</div>
-        <p class="text-xs text-slate-300 bg-slate-900/50 p-2.5 rounded-lg border border-slate-800 whitespace-pre-wrap">${esc(t.desc)}</p>
+        <p class="text-xs text-slate-300 bg-slate-900/50 p-2.5 rounded-lg border border-slate-800 whitespace-pre-wrap">${linkify(t.desc)}</p>
+        ${stepsHTML(t)}${t.repeat ? '<div class="text-[10px] text-slate-500">🔁 Se repite ' + (t.repeat === "weekly" ? "cada semana" : "cada mes") + '</div>' : ""}
         <div>${chips}</div>
         ${commentsHTML(t)}
         <div class="text-[11px] text-slate-500 flex items-center space-x-3">📅 Plazo: ${esc(t.dueDate)} <a href="${calUrl(t)}" target="_blank" class="text-sky-400 hover:underline ml-3"><i class="fa-solid fa-calendar-plus"></i> Google Calendar</a></div>
@@ -366,7 +472,9 @@ function renderTeamView() {
       <td class="py-3 px-4 text-slate-400">${ut.length}</td><td class="py-3 px-4 text-slate-400">${done}</td>
       <td class="py-3 px-4"><div class="flex items-center space-x-3"><div class="w-24 bg-slate-800 rounded-full h-2 overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${pct}%"></div></div><span class="text-xs text-slate-400">${pct}%</span></div></td></tr>`;
   }).join("");
-  $("all-tasks-list").innerHTML = tasks.length ? tasks.map(t => `
+  fillPersonFilter();
+  const list = filterTasks();
+  $("all-tasks-list").innerHTML = list.length ? list.map(t => `
     <div class="bg-slate-800/40 border ${isDone(t) ? "border-emerald-500/40" : isOverdue(t) ? "border-rose-500/60" : "border-slate-700/50"} rounded-xl p-4 flex justify-between items-center gap-4">
       <div><h4 class="font-bold text-sm">${esc(t.title)}</h4><p class="text-xs text-slate-300">${esc(t.desc)}</p>
         <span class="text-xs ${isOverdue(t) ? "text-rose-400 font-semibold" : "text-emerald-400"}">Plazo: ${esc(t.dueDate)}${isOverdue(t) ? " ⚠️ vencida" : ""}</span>
@@ -376,36 +484,65 @@ function renderTeamView() {
 }
 
 function renderAdmin() {
-  if (!isAdmin()) return;
-  if (document.activeElement?.id?.startsWith("admin-pass-")) return; // no pisar lo que se está escribiendo
-  $("admin-users-list").innerHTML = Object.entries(users).map(([k, u]) => `
-    <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex justify-between items-center gap-4 flex-wrap">
-      <div><h4 class="font-bold text-sm">${esc(u.name)}</h4><p class="text-xs text-emerald-400">${esc(u.role)}</p></div>
-      <div class="flex gap-2"><input type="text" id="admin-pass-${esc(k)}" placeholder="Nueva contraseña" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs w-36">
-        <button onclick="adminSaveUser('${esc(k)}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold">Guardar</button></div></div>`).join("");
+  if (!isAdmin() || $("admin-users-list").contains(document.activeElement)) return;
+  $("admin-users-list").innerHTML = Object.entries(users).map(([k, u]) => {
+    const mg = u.manages ?? hierarchy[k] ?? [], fixed = k === "Augusto" || k === "Ada";
+    return `<div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 space-y-3">
+      <div class="flex justify-between items-center gap-2 flex-wrap"><div><h4 class="font-bold text-sm">${esc(u.avatar)} ${esc(u.name)}</h4><p class="text-xs text-emerald-400">${esc(k)}</p></div>
+        <div class="flex gap-2"><input type="text" id="admin-pass-${esc(k)}" placeholder="Nueva contraseña" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs w-36">
+          <button onclick="adminSaveUser('${esc(k)}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold">Guardar</button>
+          ${fixed || k === me ? "" : `<button onclick="deleteMember('${esc(k)}')" class="bg-rose-500/10 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-lg text-xs"><i class="fa-solid fa-trash-can"></i></button>`}</div></div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="text-[10px] uppercase text-slate-400">Cargo</label><select id="adm-role-${esc(k)}" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs">${officialRoles.map(r => `<option ${r === u.role ? "selected" : ""}>${esc(r)}</option>`).join("")}</select>
+          <label class="text-xs text-slate-300 flex items-center gap-2 mt-2"><input type="checkbox" id="adm-ad-${esc(k)}" class="rounded" ${isAdminKey(k) ? "checked" : ""} ${fixed ? "disabled" : ""}> Administrador</label></div>
+        <div><label class="text-[10px] uppercase text-slate-400">Puede asignar tareas a (Ctrl/⌘ para varios)</label><select multiple size="4" id="adm-mg-${esc(k)}" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs">${Object.entries(users).filter(([x]) => x !== k).map(([x, v]) => `<option value="${esc(x)}" ${mg.includes(x) ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></div>
+      </div></div>`;
+  }).join("");
 }
 
 // ---------- Acciones ----------
 window.adminSaveUser = async k => {
-  const v = $("admin-pass-" + k).value;
-  if (v.length < 4) return alert("La contraseña debe tener al menos 4 caracteres.");
-  const nh = await hash(k, v);
-  if (k === me) { sessionPass = nh; try { localStorage.setItem("etsiaab_session", JSON.stringify({ k, h: nh })); } catch {} }
-  await updateDoc(doc(db, "users", k), { pass: nh });
+  const v = $("admin-pass-" + k).value, data = { role: $("adm-role-" + k).value, manages: [...$("adm-mg-" + k).selectedOptions].map(o => o.value) };
+  if (k !== "Augusto" && k !== "Ada") data.admin = $("adm-ad-" + k).checked;
+  if (v) {
+    if (v.length < 4) return alert("La contraseña debe tener al menos 4 caracteres.");
+    data.pass = await mkHash(v);
+    if (k === me) { sessionPass = data.pass; try { localStorage.setItem("etsiaab_session", JSON.stringify({ k, h: data.pass })); } catch {} }
+  }
+  await updateDoc(doc(db, "users", k), data);
   $("admin-pass-" + k).value = "";
-  alert("¡Contraseña actualizada para todos los dispositivos!");
+  alert("¡Guardado y sincronizado en todos los dispositivos!");
 };
+window.addMember = async () => {
+  const name = $("nm-name").value.trim(), pass = $("nm-pass").value;
+  if (!name || pass.length < 4) return alert("Pon un nombre y una contraseña de al menos 4 caracteres.");
+  let key = name.normalize("NFD").replace(/[^\w]/g, "").slice(0, 20) || "miembro";
+  if (users[key]) key += String(Date.now()).slice(-4);
+  await setDoc(doc(db, "users", key), { name, role: $("nm-role").value, avatar: "🌱", pass: await mkHash(pass), manages: [] });
+  $("nm-name").value = ""; $("nm-pass").value = "";
+};
+window.deleteMember = async k => { if (confirm(`¿Eliminar a ${nm(k)}? Sus tareas se conservan.`)) await deleteDoc(doc(db, "users", k)); };
 window.handleUpdateProfile = async e => {
   e.preventDefault();
   const data = { name: $("profile-name").value.trim(), avatar: $("profile-avatar").value.trim() || "🌱" };
   if (isAdmin()) data.role = $("profile-role").value;
   const p = $("profile-password").value;
-  if (p) { data.pass = await hash(me, p); sessionPass = data.pass; try { localStorage.setItem("etsiaab_session", JSON.stringify({ k: me, h: sessionPass })); } catch {} }
+  if (p) { data.pass = await mkHash(p); sessionPass = data.pass; try { localStorage.setItem("etsiaab_session", JSON.stringify({ k: me, h: sessionPass })); } catch {} }
   await updateDoc(doc(db, "users", me), data);
   $("profile-password").value = "";
   $("profile-success").classList.remove("hidden"); setTimeout(() => $("profile-success").classList.add("hidden"), 3000);
 };
-window.updateMyTaskStatus = (id, s) => updateDoc(doc(db, "tasks", id), { ["assigneeStatus." + me]: s });
+const stTxt = { pending: "Pendiente", "in-progress": "En proceso", completed: "Completada" };
+window.updateMyTaskStatus = async (id, s) => {
+  const t = tasks.find(x => x.id === id); if (!t) return;
+  await updateDoc(doc(db, "tasks", id), { ["assigneeStatus." + me]: s, comments: arrayUnion(sysEntry(`marcó «${stTxt[s]}»`)) });
+  if (t.repeat && !t.spawned && isDone({ ...t, assigneeStatus: { ...t.assigneeStatus, [me]: s } })) {
+    await updateDoc(doc(db, "tasks", id), { spawned: true });
+    await setDoc(doc(collection(db, "tasks")), { title: t.title, desc: t.desc, urgency: t.urgency, assignees: t.assignees, repeat: t.repeat,
+      assigneeStatus: Object.fromEntries(t.assignees.map(k => [k, "pending"])), steps: (t.steps || []).map(x => ({ t: x.t, done: false })),
+      dueDate: nextDate(t.dueDate, t.repeat), createdBy: t.createdBy, createdAt: Date.now(), comments: [sysEntry("se creó automáticamente (tarea repetida)")] });
+  }
+};
 window.deleteTask = async id => { if (confirm("¿Eliminar esta tarea?")) await deleteDoc(doc(db, "tasks", id)); };
 window.deleteAllCompletedTasks = async () => {
   const list = tasks.filter(isDone);
@@ -416,7 +553,7 @@ window.deleteAllCompletedTasks = async () => {
 let editingId = null;
 function openModal(t) {
   editingId = t ? t.id : null;
-  const allowed = [...new Set([...(hierarchy[me] || [me]), ...(t ? t.assignees : [])])].filter(k => users[k]), multi = allowed.length > 1;
+  const allowed = [...new Set([...teamOf(me), ...(t ? t.assignees : [])])].filter(k => users[k]), multi = allowed.length > 1;
   $("modal-title").textContent = t ? "Editar Tarea" : "Nueva Tarea";
   $("modal-submit").textContent = t ? "Guardar Cambios" : "Crear Tarea";
   $("assignees-label").textContent = multi ? "Asignar a miembros (puedes marcar varios)" : "Tarea personal (autoasignada)";
@@ -424,26 +561,36 @@ function openModal(t) {
     <input type="checkbox" name="task-assignee" value="${esc(k)}" ${(t ? t.assignees.includes(k) : !multi) ? "checked" : ""} ${multi ? "" : 'onclick="return false"'} class="rounded"><span class="truncate">${esc(users[k].name)}</span></label>`).join("");
   $("new-title").value = t?.title || ""; $("new-desc").value = t?.desc || "";
   $("new-urgency").value = t?.urgency || "normal"; $("new-date").value = t?.dueDate || "";
+  $("new-repeat").value = t?.repeat || ""; $("new-steps").value = (t?.steps || []).map(x => x.t).join("\n");
   $("task-modal").classList.remove("hidden"); $("task-modal").classList.add("flex");
 }
 window.openNewTaskModal = () => openModal(null);
 window.openEditTask = id => { const t = tasks.find(x => x.id === id); if (t && canDelete(t)) openModal(t); };
 window.closeNewTaskModal = () => {
   $("task-modal").classList.add("hidden"); $("task-modal").classList.remove("flex");
-  editingId = null; ["new-title", "new-desc", "new-date"].forEach(i => $(i).value = "");
+  editingId = null; ["new-title", "new-desc", "new-date", "new-steps"].forEach(i => $(i).value = "");
 };
 window.handleCreateTask = async e => {
   e.preventDefault();
   let assignees = [...document.querySelectorAll('input[name="task-assignee"]:checked')].map(c => c.value);
   if (!assignees.length) assignees = [me];
-  const f = { title: $("new-title").value.trim(), desc: $("new-desc").value.trim(), urgency: $("new-urgency").value, dueDate: $("new-date").value, assignees };
-  if (editingId) {
-    const old = tasks.find(x => x.id === editingId) || {};
+  const old = editingId ? tasks.find(x => x.id === editingId) : null;
+  const doneSet = new Set((old?.steps || []).filter(x => x.done).map(x => x.t));
+  const f = { title: $("new-title").value.trim(), desc: $("new-desc").value.trim(), urgency: $("new-urgency").value, dueDate: $("new-date").value, assignees, repeat: $("new-repeat").value,
+    steps: $("new-steps").value.split("\n").map(x => x.trim()).filter(Boolean).map(x => ({ t: x, done: doneSet.has(x) })) };
+  if (old) {
     f.assigneeStatus = Object.fromEntries(assignees.map(k => [k, statusOf(old, k)]));
+    const ch = [];
+    if (old.title !== f.title) ch.push("cambió el título");
+    if (old.desc !== f.desc) ch.push("editó la descripción");
+    if (old.dueDate !== f.dueDate) ch.push(`cambió el plazo (${old.dueDate} → ${f.dueDate})`);
+    if (old.urgency !== f.urgency) ch.push(`cambió la urgencia a ${urgText(f.urgency)}`);
+    if ((old.assignees || []).join() !== assignees.join()) ch.push("cambió los asignados");
+    if (ch.length) f.comments = arrayUnion(...ch.map(x => sysEntry(x)));
     await updateDoc(doc(db, "tasks", editingId), f);
   } else {
     f.assigneeStatus = Object.fromEntries(assignees.map(k => [k, "pending"]));
-    await setDoc(doc(collection(db, "tasks")), { ...f, createdBy: me, createdAt: Date.now() });
+    await setDoc(doc(collection(db, "tasks")), { ...f, createdBy: me, createdAt: Date.now(), comments: [sysEntry("creó la tarea")] });
   }
   closeNewTaskModal();
 };
