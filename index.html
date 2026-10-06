@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestión de Tareas - Delegación ETSIAAB</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ETSIAAB">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -85,7 +93,8 @@
       <div class="bg-slate-800/30 border border-slate-800 rounded-2xl p-6">
         <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
           <h2 class="text-lg font-bold"><i class="fa-solid fa-table-list text-emerald-500"></i> Todas las Tareas del Equipo</h2>
-          <button id="delete-completed-btn" onclick="deleteAllCompletedTasks()" class="hidden bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold"><i class="fa-solid fa-trash-can"></i> Eliminar Completadas</button>
+          <div class="flex gap-2 flex-wrap"><button id="export-btn" onclick="exportCSV()" class="hidden bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold"><i class="fa-solid fa-file-csv"></i> Exportar a Excel</button>
+          <button id="delete-completed-btn" onclick="deleteAllCompletedTasks()" class="hidden bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold"><i class="fa-solid fa-trash-can"></i> Eliminar Completadas</button></div>
         </div>
         <div id="all-tasks-list" class="space-y-3"></div>
       </div>
@@ -139,7 +148,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, getDocs, writeBatch }
+import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, getDocs, writeBatch, arrayUnion }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ====== PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE (Configuración del proyecto > Tus apps > Web) ======
@@ -246,6 +255,7 @@ function enterApp(k, h) {
   $("login-screen").classList.add("hidden"); $("main-app").classList.remove("hidden");
   $("tab-admin-users").classList.toggle("hidden", !isAdmin());
   $("delete-completed-btn").classList.toggle("hidden", !isAdmin());
+  $("export-btn").classList.toggle("hidden", !isAdmin());
   $("profile-role").disabled = !isAdmin();
   $("profile-role-notice").classList.toggle("hidden", isAdmin());
   fillProfile(); updateHeader(); switchTab("my-tasks");
@@ -274,6 +284,7 @@ window.switchTab = t => {
   renderAll();
 };
 function renderAll() {
+  if (document.activeElement?.classList?.contains("cmt-input")) return;
   if (tab === "my-tasks") renderMyTasks();
   if (tab === "team-view") renderTeamView();
   if (tab === "admin-users") renderAdmin();
@@ -286,8 +297,41 @@ const isOverdue = (t, k) => t.dueDate && t.dueDate < today() && (k ? statusOf(t,
 const editBtn = (id, cls) => `<button onclick="openEditTask('${id}')" title="Editar" class="text-slate-500 hover:text-sky-400 ${cls}"><i class="fa-solid fa-pen"></i></button>`;
 const calUrl = t => { const d = (t.dueDate || "").replace(/-/g, ""); return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t.title)}&dates=${d}/${d}&details=${encodeURIComponent(t.desc + " (ETSIAAB)")}`; };
 
+const openC = new Set();
+window.toggleComments = id => { openC.has(id) ? openC.delete(id) : openC.add(id); renderAll(); };
+const commentsHTML = t => {
+  const c = t.comments || [], open = openC.has(t.id);
+  return `<div class="mt-1"><button onclick="toggleComments('${t.id}')" class="text-[11px] text-sky-400 hover:underline"><i class="fa-regular fa-comments"></i> Comentarios (${c.length})</button>${open ? `<div class="mt-2 space-y-2">${c.map(x => `<div class="bg-slate-900/60 border border-slate-800 rounded-lg p-2 text-xs"><span class="text-emerald-400 font-semibold">${esc(users[x.by]?.name || x.by)}</span> <span class="text-slate-500">${new Date(x.at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}</span><p class="text-slate-300 whitespace-pre-wrap">${esc(x.text)}</p></div>`).join("")}
+    <div class="flex gap-2"><input id="cmt-${t.id}" maxlength="500" placeholder="Escribe un comentario..." onkeydown="if(event.key==='Enter')addComment('${t.id}')" class="cmt-input flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs"><button onclick="addComment('${t.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 rounded-lg text-xs font-semibold">Enviar</button></div></div>` : ""}</div>`;
+};
+window.addComment = async id => {
+  const inp = $("cmt-" + id), text = inp.value.trim(); if (!text) return;
+  inp.value = ""; inp.blur();
+  await updateDoc(doc(db, "tasks", id), { comments: arrayUnion({ by: me, text, at: Date.now() }) });
+};
+const seenKey = () => "etsiaab_seen_" + me;
+const getSeen = () => { try { const v = localStorage.getItem(seenKey()); return v ? new Set(JSON.parse(v)) : null; } catch { return null; } };
+const saveSeen = ids => { try { localStorage.setItem(seenKey(), JSON.stringify(ids)); } catch {} };
+let seenTimer;
+window.exportCSV = () => {
+  const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`, nm = k => users[k]?.name || k;
+  const st = { pending: "Pendiente", "in-progress": "En proceso", completed: "Completada" };
+  const head = ["Título", "Descripción", "Urgencia", "Plazo", "Asignados", "Estado por persona", "Completada", "Creada por", "Comentarios"];
+  const rows = tasks.map(t => [t.title, t.desc, urgText(t.urgency), t.dueDate, (t.assignees || []).map(nm).join(", "),
+    (t.assignees || []).map(k => `${nm(k)}: ${st[statusOf(t, k)]}`).join(" | "), isDone(t) ? "Sí" : "No", nm(t.createdBy || ""),
+    (t.comments || []).map(c => `${nm(c.by)}: ${c.text}`).join(" | ")]);
+  const csv = "\ufeff" + [head, ...rows].map(r => r.map(q).join(";")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = `tareas-etsiaab-${today()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+
 function renderMyTasks() {
   const mine = tasks.filter(t => (t.assignees || []).includes(me));
+  const mineIds = mine.map(t => t.id);
+  let seen = getSeen(); if (!seen) { seen = new Set(mineIds); saveSeen(mineIds); }
+  const isNew = t => !seen.has(t.id) && t.createdBy !== me;
+  clearTimeout(seenTimer); seenTimer = setTimeout(() => saveSeen(mineIds), 6000);
   const c = { pending: 0, "in-progress": 0, completed: 0 };
   mine.forEach(t => c[statusOf(t, me)]++);
   $("count-pending").textContent = c.pending; $("count-progress").textContent = c["in-progress"]; $("count-completed").textContent = c.completed;
@@ -300,9 +344,10 @@ function renderMyTasks() {
       <div class="space-y-2 flex-1">
         <div class="flex items-center flex-wrap gap-2"><h4 class="font-bold text-sm ${my === "completed" ? "line-through text-slate-400" : ""}">${esc(t.title)}</h4>
           <span class="text-[10px] px-2 py-0.5 rounded font-medium ${urgClass(t.urgency)}">${urgText(t.urgency)}</span>
-          ${done ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-400">🎉 ¡Completada!</span>' : ""}${overdue ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-rose-500/20 text-rose-400">⚠️ Vencida</span>' : ""}</div>
+          ${done ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-400">🎉 ¡Completada!</span>' : ""}${overdue ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-rose-500/20 text-rose-400">⚠️ Vencida</span>' : ""}${isNew(t) ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-sky-500/20 text-sky-300 animate-pulse">🆕 Nueva</span>' : ""}</div>
         <p class="text-xs text-slate-300 bg-slate-900/50 p-2.5 rounded-lg border border-slate-800 whitespace-pre-wrap">${esc(t.desc)}</p>
         <div>${chips}</div>
+        ${commentsHTML(t)}
         <div class="text-[11px] text-slate-500 flex items-center space-x-3">📅 Plazo: ${esc(t.dueDate)} <a href="${calUrl(t)}" target="_blank" class="text-sky-400 hover:underline ml-3"><i class="fa-solid fa-calendar-plus"></i> Google Calendar</a></div>
       </div>
       <div class="flex items-center space-x-3 self-end sm:self-center">
@@ -325,7 +370,7 @@ function renderTeamView() {
     <div class="bg-slate-800/40 border ${isDone(t) ? "border-emerald-500/40" : isOverdue(t) ? "border-rose-500/60" : "border-slate-700/50"} rounded-xl p-4 flex justify-between items-center gap-4">
       <div><h4 class="font-bold text-sm">${esc(t.title)}</h4><p class="text-xs text-slate-300">${esc(t.desc)}</p>
         <span class="text-xs ${isOverdue(t) ? "text-rose-400 font-semibold" : "text-emerald-400"}">Plazo: ${esc(t.dueDate)}${isOverdue(t) ? " ⚠️ vencida" : ""}</span>
-        <span class="text-xs text-slate-500 ml-2">${(t.assignees || []).map(k => esc(users[k]?.name || k)).join(", ")}</span></div>
+        <span class="text-xs text-slate-500 ml-2">${(t.assignees || []).map(k => esc(users[k]?.name || k)).join(", ")}</span>${commentsHTML(t)}</div>
       ${canDelete(t) ? `<div class="flex gap-3">${editBtn(t.id, "")}<button onclick="deleteTask('${t.id}')" class="text-slate-500 hover:text-rose-400"><i class="fa-solid fa-trash-can"></i></button></div>` : ""}</div>`).join("")
     : '<div class="text-center py-8 text-slate-500 text-sm">No hay tareas.</div>';
 }
@@ -403,6 +448,7 @@ window.handleCreateTask = async e => {
   closeNewTaskModal();
 };
 
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
 init();
 </script>
 </body>
