@@ -340,7 +340,6 @@ window.handleLogin = async () => {
   let st = users[k].pass;
   if (!st.startsWith("pb$")) { st = await mkHash(pw); sessionPass = st; await updateDoc(doc(db, "users", k), { pass: st }); }
   enterApp(k, st);
-enterApp(k, h);
 };
 function tryAutoLogin() {
   try { const x = JSON.parse(localStorage.getItem("etsiaab_session") || "null");
@@ -374,7 +373,7 @@ function fillProfile() {
 let tab = "my-tasks";
 window.switchTab = t => {
   tab = t;
-  ["my-tasks", "team-view", "my-profile", "admin-users"].forEach(x => {
+  ["my-tasks", "team-view", "calendar", "my-profile", "admin-users"].forEach(x => {
     $("view-" + x).classList.toggle("hidden", x !== t);
     $("tab-" + x).className = "px-4 py-2 rounded-lg text-xs font-semibold transition-all " + (x === t ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white") + (x === "admin-users" && !isAdmin() ? " hidden" : "");
   });
