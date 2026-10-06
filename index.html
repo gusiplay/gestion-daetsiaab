@@ -69,7 +69,8 @@
         <div class="bg-slate-800/50 border border-slate-800 rounded-2xl p-5"><div class="text-slate-400 text-xs font-semibold uppercase mb-1">Completadas</div><div id="count-completed" class="text-3xl font-black text-emerald-400">0</div></div>
       </div>
       <div class="bg-slate-800/30 border border-slate-800 rounded-2xl p-6">
-        <h2 class="text-lg font-bold mb-4"><i class="fa-solid fa-list-check text-emerald-500"></i> Tareas Asignadas a Mí</h2>
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2"><h2 class="text-lg font-bold"><i class="fa-solid fa-list-check text-emerald-500"></i> Tareas Asignadas a Mí</h2>
+          <label class="text-xs text-slate-400 flex items-center gap-2 cursor-pointer"><input type="checkbox" id="hide-done" onchange="renderAll()" class="rounded"> Ocultar completadas</label></div>
         <div id="my-tasks-list" class="space-y-3"></div>
       </div>
     </div>
@@ -118,7 +119,7 @@
 <!-- MODAL -->
 <div id="task-modal" class="fixed inset-0 bg-slate-950/80 z-50 hidden items-center justify-center p-4">
   <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
-    <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold">Nueva Tarea</h3><button onclick="closeNewTaskModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button></div>
+    <div class="flex items-center justify-between mb-4"><h3 id="modal-title" class="text-lg font-bold">Nueva Tarea</h3><button onclick="closeNewTaskModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button></div>
     <form onsubmit="handleCreateTask(event)" class="space-y-4">
       <input type="text" id="new-title" required placeholder="Título" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm">
       <textarea id="new-desc" rows="3" required placeholder="Detalles..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm"></textarea>
@@ -130,7 +131,7 @@
         <input type="date" id="new-date" required class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm">
       </div>
       <div class="flex justify-end space-x-3"><button type="button" onclick="closeNewTaskModal()" class="bg-slate-800 text-slate-300 px-4 py-2.5 rounded-xl text-xs font-semibold">Cancelar</button>
-        <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold">Crear Tarea</button></div>
+        <button type="submit" id="modal-submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold">Crear Tarea</button></div>
     </form>
   </div>
 </div>
@@ -173,7 +174,7 @@ const defaultUsers = {
   Eva: ["Eva Almendros","Subdelegado de Calidad y Asuntos Académicos","📚"], Mayra: ["Mayra Moreno","Secretaría de Asuntos Académicos","📝"]
 };
 
-let users = {}, tasks = [], me = null, db;
+let users = {}, tasks = [], me = null, db, sessionPass = null;
 const $ = id => document.getElementById(id);
 const isAdmin = () => me === "Augusto" || me === "Ada";
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -203,11 +204,13 @@ async function init() {
     onSnapshot(collection(db, "users"), s => {
       users = {}; s.forEach(d => users[d.id] = d.data());
       populateUserSelect(); setConn(true);
-      if (me) { if (!users[me]) return handleLogout(); updateHeader(); renderAll(); }
+      if (!me) tryAutoLogin();
+      else { if (!users[me] || users[me].pass !== sessionPass) return handleLogout(); updateHeader(); renderAll(); }
     }, () => setConn(false, "Sin conexión con la nube"));
     onSnapshot(collection(db, "tasks"), s => {
       tasks = []; s.forEach(d => tasks.push({ id: d.id, ...d.data() }));
-      tasks.sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
+      const rank = { "muy-urgente": 0, urgente: 1, normal: 2, "poco-urgente": 3 };
+      tasks.sort((a, b) => (isDone(a) - isDone(b)) || ((rank[a.urgency] ?? 2) - (rank[b.urgency] ?? 2)) || (a.dueDate || "").localeCompare(b.dueDate || ""));
       if (me) renderAll();
     });
   } catch (e) { console.error(e); setConn(false, "Error al conectar: revisa la configuración y las reglas"); }
@@ -228,9 +231,18 @@ window.handleLogin = async () => {
   const k = $("user-select").value, err = $("login-error");
   err.classList.remove("hidden");
   if (!k || !users[k]) { err.textContent = "Selecciona tu nombre."; return; }
-  if (users[k].pass !== await hash(k, $("password-input").value)) { err.textContent = "Contraseña incorrecta. Si la han cambiado, pídesela a Augusto o Ada."; return; }
+  const h = await hash(k, $("password-input").value);
+  if (users[k].pass !== h) { err.textContent = "Contraseña incorrecta. Si la han cambiado, pídesela a Augusto o Ada."; return; }
   err.classList.add("hidden");
-  me = k;
+  enterApp(k, h);
+};
+function tryAutoLogin() {
+  try { const x = JSON.parse(localStorage.getItem("etsiaab_session") || "null");
+    if (x && users[x.k] && users[x.k].pass === x.h) enterApp(x.k, x.h); } catch {}
+}
+function enterApp(k, h) {
+  me = k; sessionPass = h;
+  try { localStorage.setItem("etsiaab_session", JSON.stringify({ k, h })); } catch {}
   $("login-screen").classList.add("hidden"); $("main-app").classList.remove("hidden");
   $("tab-admin-users").classList.toggle("hidden", !isAdmin());
   $("delete-completed-btn").classList.toggle("hidden", !isAdmin());
@@ -239,7 +251,7 @@ window.handleLogin = async () => {
   fillProfile(); updateHeader(); switchTab("my-tasks");
 };
 window.handleLogout = () => {
-  me = null; $("password-input").value = ""; $("user-select").value = "";
+  me = null; sessionPass = null; try { localStorage.removeItem("etsiaab_session"); } catch {} $("password-input").value = ""; $("user-select").value = "";
   $("main-app").classList.add("hidden"); $("login-screen").classList.remove("hidden");
 };
 function updateHeader() {
@@ -269,6 +281,9 @@ function renderAll() {
 const urgText = u => ({ "muy-urgente": "🔥 Muy Urgente", urgente: "⚡ Urgente", normal: "📌 Normal" }[u] || "☕ Poco Urgente");
 const urgClass = u => ({ "muy-urgente": "bg-rose-500/10 text-rose-400 border border-rose-500/20", urgente: "bg-amber-500/10 text-amber-400 border border-amber-500/20", normal: "bg-sky-500/10 text-sky-400 border border-sky-500/20" }[u] || "bg-slate-700/50 text-slate-400 border border-slate-600");
 const canDelete = t => isAdmin() || t.createdBy === me;
+const today = () => new Date().toLocaleDateString("sv-SE");
+const isOverdue = (t, k) => t.dueDate && t.dueDate < today() && (k ? statusOf(t, k) !== "completed" : !isDone(t));
+const editBtn = (id, cls) => `<button onclick="openEditTask('${id}')" title="Editar" class="text-slate-500 hover:text-sky-400 ${cls}"><i class="fa-solid fa-pen"></i></button>`;
 const calUrl = t => { const d = (t.dueDate || "").replace(/-/g, ""); return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t.title)}&dates=${d}/${d}&details=${encodeURIComponent(t.desc + " (ETSIAAB)")}`; };
 
 function renderMyTasks() {
@@ -276,15 +291,16 @@ function renderMyTasks() {
   const c = { pending: 0, "in-progress": 0, completed: 0 };
   mine.forEach(t => c[statusOf(t, me)]++);
   $("count-pending").textContent = c.pending; $("count-progress").textContent = c["in-progress"]; $("count-completed").textContent = c.completed;
-  $("my-tasks-list").innerHTML = mine.length ? mine.map(t => {
-    const my = statusOf(t, me), done = isDone(t);
+  const shown = $("hide-done").checked ? mine.filter(t => statusOf(t, me) !== "completed") : mine;
+  $("my-tasks-list").innerHTML = shown.length ? shown.map(t => {
+    const my = statusOf(t, me), done = isDone(t), overdue = isOverdue(t, me);
     const chips = t.assignees.map(k => { const u = users[k] || { name: k, avatar: "🌱" }, s = statusOf(t, k);
       return `<span class="bg-slate-900 px-2 py-0.5 rounded border border-slate-700 text-[11px] mr-1 mb-1 inline-block">${esc(u.avatar)} ${esc(u.name)} ${s === "completed" ? "✅" : s === "in-progress" ? "⚡" : "⏳"}</span>`; }).join("");
-    return `<div class="bg-slate-800/60 border ${done ? "border-emerald-500/40" : "border-slate-700/60"} rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    return `<div class="bg-slate-800/60 border ${done ? "border-emerald-500/40" : overdue ? "border-rose-500/60" : "border-slate-700/60"} rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div class="space-y-2 flex-1">
         <div class="flex items-center flex-wrap gap-2"><h4 class="font-bold text-sm ${my === "completed" ? "line-through text-slate-400" : ""}">${esc(t.title)}</h4>
           <span class="text-[10px] px-2 py-0.5 rounded font-medium ${urgClass(t.urgency)}">${urgText(t.urgency)}</span>
-          ${done ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-400">🎉 ¡Completada!</span>' : ""}</div>
+          ${done ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-400">🎉 ¡Completada!</span>' : ""}${overdue ? '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-rose-500/20 text-rose-400">⚠️ Vencida</span>' : ""}</div>
         <p class="text-xs text-slate-300 bg-slate-900/50 p-2.5 rounded-lg border border-slate-800 whitespace-pre-wrap">${esc(t.desc)}</p>
         <div>${chips}</div>
         <div class="text-[11px] text-slate-500 flex items-center space-x-3">📅 Plazo: ${esc(t.dueDate)} <a href="${calUrl(t)}" target="_blank" class="text-sky-400 hover:underline ml-3"><i class="fa-solid fa-calendar-plus"></i> Google Calendar</a></div>
@@ -292,7 +308,7 @@ function renderMyTasks() {
       <div class="flex items-center space-x-3 self-end sm:self-center">
         <select onchange="updateMyTaskStatus('${t.id}', this.value)" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300">
           <option value="pending" ${my === "pending" ? "selected" : ""}>⏳ Pendiente</option><option value="in-progress" ${my === "in-progress" ? "selected" : ""}>⚡ En Proceso</option><option value="completed" ${my === "completed" ? "selected" : ""}>✅ Completada</option></select>
-        ${canDelete(t) ? `<button onclick="deleteTask('${t.id}')" class="text-slate-500 hover:text-rose-400 p-1.5"><i class="fa-solid fa-trash-can"></i></button>` : ""}
+        ${canDelete(t) ? editBtn(t.id, "p-1.5") + `<button onclick="deleteTask('${t.id}')" class="text-slate-500 hover:text-rose-400 p-1.5"><i class="fa-solid fa-trash-can"></i></button>` : ""}
       </div></div>`;
   }).join("") : '<div class="text-center py-8 text-slate-500 text-sm">No tienes tareas asignadas. ¡Todo al día!</div>';
 }
@@ -306,11 +322,11 @@ function renderTeamView() {
       <td class="py-3 px-4"><div class="flex items-center space-x-3"><div class="w-24 bg-slate-800 rounded-full h-2 overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${pct}%"></div></div><span class="text-xs text-slate-400">${pct}%</span></div></td></tr>`;
   }).join("");
   $("all-tasks-list").innerHTML = tasks.length ? tasks.map(t => `
-    <div class="bg-slate-800/40 border ${isDone(t) ? "border-emerald-500/40" : "border-slate-700/50"} rounded-xl p-4 flex justify-between items-center gap-4">
+    <div class="bg-slate-800/40 border ${isDone(t) ? "border-emerald-500/40" : isOverdue(t) ? "border-rose-500/60" : "border-slate-700/50"} rounded-xl p-4 flex justify-between items-center gap-4">
       <div><h4 class="font-bold text-sm">${esc(t.title)}</h4><p class="text-xs text-slate-300">${esc(t.desc)}</p>
-        <span class="text-xs text-emerald-400">Plazo: ${esc(t.dueDate)}</span>
+        <span class="text-xs ${isOverdue(t) ? "text-rose-400 font-semibold" : "text-emerald-400"}">Plazo: ${esc(t.dueDate)}${isOverdue(t) ? " ⚠️ vencida" : ""}</span>
         <span class="text-xs text-slate-500 ml-2">${(t.assignees || []).map(k => esc(users[k]?.name || k)).join(", ")}</span></div>
-      ${canDelete(t) ? `<button onclick="deleteTask('${t.id}')" class="text-slate-500 hover:text-rose-400"><i class="fa-solid fa-trash-can"></i></button>` : ""}</div>`).join("")
+      ${canDelete(t) ? `<div class="flex gap-3">${editBtn(t.id, "")}<button onclick="deleteTask('${t.id}')" class="text-slate-500 hover:text-rose-400"><i class="fa-solid fa-trash-can"></i></button></div>` : ""}</div>`).join("")
     : '<div class="text-center py-8 text-slate-500 text-sm">No hay tareas.</div>';
 }
 
@@ -328,7 +344,9 @@ function renderAdmin() {
 window.adminSaveUser = async k => {
   const v = $("admin-pass-" + k).value;
   if (v.length < 4) return alert("La contraseña debe tener al menos 4 caracteres.");
-  await updateDoc(doc(db, "users", k), { pass: await hash(k, v) });
+  const nh = await hash(k, v);
+  if (k === me) { sessionPass = nh; try { localStorage.setItem("etsiaab_session", JSON.stringify({ k, h: nh })); } catch {} }
+  await updateDoc(doc(db, "users", k), { pass: nh });
   $("admin-pass-" + k).value = "";
   alert("¡Contraseña actualizada para todos los dispositivos!");
 };
@@ -337,7 +355,7 @@ window.handleUpdateProfile = async e => {
   const data = { name: $("profile-name").value.trim(), avatar: $("profile-avatar").value.trim() || "🌱" };
   if (isAdmin()) data.role = $("profile-role").value;
   const p = $("profile-password").value;
-  if (p) data.pass = await hash(me, p);
+  if (p) { data.pass = await hash(me, p); sessionPass = data.pass; try { localStorage.setItem("etsiaab_session", JSON.stringify({ k: me, h: sessionPass })); } catch {} }
   await updateDoc(doc(db, "users", me), data);
   $("profile-password").value = "";
   $("profile-success").classList.remove("hidden"); setTimeout(() => $("profile-success").classList.add("hidden"), 3000);
@@ -350,26 +368,38 @@ window.deleteAllCompletedTasks = async () => {
   const b = writeBatch(db); list.forEach(t => b.delete(doc(db, "tasks", t.id))); await b.commit();
 };
 
-window.openNewTaskModal = () => {
-  const allowed = (hierarchy[me] || [me]).filter(k => users[k]), multi = allowed.length > 1;
+let editingId = null;
+function openModal(t) {
+  editingId = t ? t.id : null;
+  const allowed = [...new Set([...(hierarchy[me] || [me]), ...(t ? t.assignees : [])])].filter(k => users[k]), multi = allowed.length > 1;
+  $("modal-title").textContent = t ? "Editar Tarea" : "Nueva Tarea";
+  $("modal-submit").textContent = t ? "Guardar Cambios" : "Crear Tarea";
   $("assignees-label").textContent = multi ? "Asignar a miembros (puedes marcar varios)" : "Tarea personal (autoasignada)";
   $("assignees-checkboxes").innerHTML = allowed.map(k => `<label class="flex items-center space-x-2 text-xs text-slate-300 p-1">
-    <input type="checkbox" name="task-assignee" value="${esc(k)}" ${multi ? "" : 'checked onclick="return false"'} class="rounded"><span class="truncate">${esc(users[k].name)}</span></label>`).join("");
+    <input type="checkbox" name="task-assignee" value="${esc(k)}" ${(t ? t.assignees.includes(k) : !multi) ? "checked" : ""} ${multi ? "" : 'onclick="return false"'} class="rounded"><span class="truncate">${esc(users[k].name)}</span></label>`).join("");
+  $("new-title").value = t?.title || ""; $("new-desc").value = t?.desc || "";
+  $("new-urgency").value = t?.urgency || "normal"; $("new-date").value = t?.dueDate || "";
   $("task-modal").classList.remove("hidden"); $("task-modal").classList.add("flex");
-};
+}
+window.openNewTaskModal = () => openModal(null);
+window.openEditTask = id => { const t = tasks.find(x => x.id === id); if (t && canDelete(t)) openModal(t); };
 window.closeNewTaskModal = () => {
   $("task-modal").classList.add("hidden"); $("task-modal").classList.remove("flex");
-  ["new-title", "new-desc", "new-date"].forEach(i => $(i).value = "");
+  editingId = null; ["new-title", "new-desc", "new-date"].forEach(i => $(i).value = "");
 };
 window.handleCreateTask = async e => {
   e.preventDefault();
   let assignees = [...document.querySelectorAll('input[name="task-assignee"]:checked')].map(c => c.value);
   if (!assignees.length) assignees = [me];
-  const assigneeStatus = Object.fromEntries(assignees.map(k => [k, "pending"]));
-  await setDoc(doc(collection(db, "tasks")), {
-    title: $("new-title").value.trim(), desc: $("new-desc").value.trim(), assignees, assigneeStatus,
-    urgency: $("new-urgency").value, dueDate: $("new-date").value, createdBy: me, createdAt: Date.now()
-  });
+  const f = { title: $("new-title").value.trim(), desc: $("new-desc").value.trim(), urgency: $("new-urgency").value, dueDate: $("new-date").value, assignees };
+  if (editingId) {
+    const old = tasks.find(x => x.id === editingId) || {};
+    f.assigneeStatus = Object.fromEntries(assignees.map(k => [k, statusOf(old, k)]));
+    await updateDoc(doc(db, "tasks", editingId), f);
+  } else {
+    f.assigneeStatus = Object.fromEntries(assignees.map(k => [k, "pending"]));
+    await setDoc(doc(collection(db, "tasks")), { ...f, createdBy: me, createdAt: Date.now() });
+  }
   closeNewTaskModal();
 };
 
