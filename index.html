@@ -41,7 +41,7 @@
             <div class="mt-6 text-center text-xs text-slate-500 space-y-1">
                 <p>Contraseña por defecto: <code class="bg-slate-800 px-2 py-1 rounded text-slate-300">etsiaab2026</code></p>
                 <p class="text-emerald-400 font-semibold flex items-center justify-center gap-1">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sistema Local e Independiente
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sincronización Cloud Global ☁️
                 </p>
             </div>
         </div>
@@ -96,8 +96,8 @@
                 </div>
                 <div class="flex items-center space-x-2">
                     <div id="sync-status-badge" class="hidden sm:flex items-center space-x-1.5 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs">
-                        <i class="fa-solid fa-hard-drive text-[10px]"></i>
-                        <span id="sync-status-text">Almacenamiento Local Seguro</span>
+                        <i class="fa-solid fa-cloud text-[10px]"></i>
+                        <span id="sync-status-text">Sincronizando con la Nube...</span>
                     </div>
                     <button onclick="openNewTaskModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-2 shadow-lg shadow-emerald-600/20">
                         <i class="fa-solid fa-plus"></i>
@@ -335,30 +335,75 @@
             }
         ];
 
-        // INICIALIZACIÓN 100% ROBUSTA LOCAL (Evita cualquier bloqueo de red, CORS o file://)
         let users = JSON.parse(localStorage.getItem('etsiaab_users')) || defaultUsers;
         let tasks = JSON.parse(localStorage.getItem('etsiaab_tasks')) || defaultTasks;
         let currentUserKey = null;
 
-        window.addEventListener('DOMContentLoaded', () => {
-            // Asegurarnos de que localStorage tenga datos si estuviera corrupto
-            if (!users || Object.keys(users).length === 0) {
-                users = defaultUsers;
-                localStorage.setItem('etsiaab_users', JSON.stringify(users));
-            }
-            if (!tasks || tasks.length === 0) {
-                tasks = defaultTasks;
-                localStorage.setItem('etsiaab_tasks', JSON.stringify(tasks));
-            }
+        const CLOUD_API_URL = "https://kvdb.io/4WqK2jFmZ6v6s9xY2Z9x8q/etsiaab_state_v2";
 
+        // Inicialización al abrir la página y sincronización periódica
+        window.addEventListener('DOMContentLoaded', () => {
             populateUserSelect();
             populateRoleSelects();
             populateCheckboxes();
+            
+            // Sincronizar al iniciar y cada 4 segundos en segundo plano
+            syncFromCloudSilently();
+            setInterval(() => {
+                syncFromCloudSilently();
+            }, 4000);
         });
 
-        function saveDataLocally() {
+        async function syncFromCloudSilently() {
+            try {
+                const res = await fetch(CLOUD_API_URL, { cache: 'no-store' });
+                if (res.ok) {
+                    const cloudData = await res.json();
+                    if (cloudData && cloudData.tasks && cloudData.users) {
+                        tasks = cloudData.tasks;
+                        users = cloudData.users;
+                        localStorage.setItem('etsiaab_tasks', JSON.stringify(tasks));
+                        localStorage.setItem('etsiaab_users', JSON.stringify(users));
+                        populateUserSelect();
+                        if (currentUserKey) {
+                            renderApp();
+                        }
+                    }
+                }
+                updateSyncIndicator(true);
+            } catch (e) {
+                updateSyncIndicator(false);
+            }
+        }
+
+        async function syncToCloudSilently() {
             localStorage.setItem('etsiaab_users', JSON.stringify(users));
             localStorage.setItem('etsiaab_tasks', JSON.stringify(tasks));
+
+            try {
+                await fetch(CLOUD_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ users, tasks })
+                });
+                updateSyncIndicator(true);
+            } catch (e) {
+                updateSyncIndicator(false);
+            }
+        }
+
+        function updateSyncIndicator(isOnline) {
+            const badge = document.getElementById('sync-status-badge');
+            const text = document.getElementById('sync-status-text');
+            if (!badge || !text) return;
+            badge.classList.remove('hidden');
+            if (isOnline) {
+                badge.className = "hidden sm:flex items-center space-x-1.5 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs";
+                text.textContent = "Sincronizado en la Nube Global ☁️";
+            } else {
+                badge.className = "hidden sm:flex items-center space-x-1.5 px-3 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl text-xs";
+                text.textContent = "Modo Local (Sin red)";
+            }
         }
 
         function populateRoleSelects() {
@@ -501,11 +546,13 @@
             document.getElementById('login-screen').classList.remove('hidden');
         }
 
-        function switchTab(tab) {
+        async function switchTab(tab) {
             if (tab === 'admin-users' && currentUserKey !== 'Augusto' && currentUserKey !== 'Ada') {
                 alert("Acceso no autorizado.");
                 return;
             }
+
+            await syncFromCloudSilently();
 
             const btnMy = document.getElementById('tab-my-tasks');
             const btnTeam = document.getElementById('tab-team-view');
@@ -774,7 +821,7 @@
             }).join('');
         }
 
-        function adminSaveUser(key) {
+        async function adminSaveUser(key) {
             if (currentUserKey !== 'Augusto' && currentUserKey !== 'Ada') return;
             const newRole = document.getElementById(`admin-role-${key}`).value;
             const newPass = document.getElementById(`admin-pass-${key}`).value;
@@ -782,14 +829,14 @@
             if (users[key]) {
                 users[key].role = newRole;
                 users[key].pass = newPass;
-                saveDataLocally();
+                await syncToCloudSilently();
                 populateUserSelect();
                 alert(`¡Datos de ${users[key].name} actualizados correctamente!`);
                 renderAdminUsersList();
             }
         }
 
-        function deleteTask(id) {
+        async function deleteTask(id) {
             tasks = JSON.parse(localStorage.getItem('etsiaab_tasks')) || tasks;
             const task = tasks.find(t => t.id === id);
             if (!task) return;
@@ -797,7 +844,7 @@
             if (currentUserKey === 'Augusto' || currentUserKey === 'Ada' || (task.assignees && task.assignees.includes(currentUserKey))) {
                 if (confirm("¿Estás seguro de eliminar esta tarea?")) {
                     tasks = tasks.filter(t => t.id !== id);
-                    saveDataLocally();
+                    await syncToCloudSilently();
                     renderTeamView();
                     if (currentUserKey) renderMyTasks();
                 }
@@ -806,35 +853,35 @@
             }
         }
 
-        function deleteAllCompletedTasks() {
+        async function deleteAllCompletedTasks() {
             if (currentUserKey === 'Augusto' || currentUserKey === 'Ada') {
                 if (confirm("¿Estás seguro de eliminar todas las tareas completadas por todos del equipo?")) {
                     tasks = tasks.filter(t => {
                         const allDone = t.assignees && t.assignees.every(k => t.assigneeStatus && t.assigneeStatus[k] === 'completed');
                         return !allDone;
                     });
-                    saveDataLocally();
+                    await syncToCloudSilently();
                     renderTeamView();
                     if (currentUserKey) renderMyTasks();
                 }
             }
         }
 
-        function handleUpdateProfile(e) {
+        async function handleUpdateProfile(e) {
             e.preventDefault();
             const newName = document.getElementById('profile-name').value;
-            const newAvatar = document.getElementById('profile-avatar').value;
+            const newAvatar = document.getElementById('profile-avatar-input')?.value || document.getElementById('profile-avatar').value;
             const newPass = document.getElementById('profile-password').value;
 
             users[currentUserKey].name = newName;
-            if(newAvatar.trim() !== "") users[currentUserKey].avatar = newAvatar;
-            if(newPass.trim() !== "") users[currentUserKey].pass = newPass;
+            if(newAvatar && newAvatar.trim() !== "") users[currentUserKey].avatar = newAvatar;
+            if(newPass && newPass.trim() !== "") users[currentUserKey].pass = newPass;
 
             if (currentUserKey === 'Augusto' || currentUserKey === 'Ada') {
                 users[currentUserKey].role = document.getElementById('profile-role').value;
             }
 
-            saveDataLocally();
+            await syncToCloudSilently();
             updateHeaderInfo();
             populateUserSelect();
             
@@ -842,7 +889,7 @@
             setTimeout(() => { document.getElementById('profile-success').classList.add('hidden'); }, 3000);
         }
 
-        function updateMyTaskStatus(id, newStatus) {
+        async function updateMyTaskStatus(id, newStatus) {
             tasks = JSON.parse(localStorage.getItem('etsiaab_tasks')) || tasks;
             const task = tasks.find(t => t.id === id);
             if (task) {
@@ -856,7 +903,7 @@
                     task.completedAt = null;
                 }
 
-                saveDataLocally();
+                await syncToCloudSilently();
                 renderMyTasks();
                 if (!document.getElementById('view-team-view').classList.contains('hidden')) {
                     renderTeamView();
@@ -884,7 +931,7 @@
             document.getElementById('new-date').value = "";
         }
 
-        function handleCreateTask(e) {
+        async function handleCreateTask(e) {
             e.preventDefault();
             const title = document.getElementById('new-title').value;
             const desc = document.getElementById('new-desc').value;
@@ -916,7 +963,7 @@
             };
 
             tasks.push(newTask);
-            saveDataLocally();
+            await syncToCloudSilently();
             closeNewTaskModal();
             renderTeamView();
             if (currentUserKey) renderMyTasks();
